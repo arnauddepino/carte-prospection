@@ -38,7 +38,9 @@ function App() {
       else color = "black";
     }
 
+    if (typeof layer.setStyle === "function") {
     layer.setStyle({ color, weight: 1, fillOpacity: 0.4 });
+    }
   };
 
   useEffect(() => {
