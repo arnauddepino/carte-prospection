@@ -37,16 +37,16 @@ function App() {
       else if (diffDays < 90) color = "red";
       else color = "black";
     }
-
+    
     if (typeof layer.setStyle === "function") {
-    layer.setStyle({ color, weight: 1, fillOpacity: 0.4 });
+      layer.setStyle({ color, weight: 1, fillOpacity: 0.4 });
     }
   };
 
   useEffect(() => {
     const loadBuildings = async () => {
       try {
-        const response = await fetch("buildings15e-full.json");
+        const response = await fetch("buildings15e-full-v3.geojson");
         const data = await response.json();
         setBuildings(data);
         await refresh();
