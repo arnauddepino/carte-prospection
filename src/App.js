@@ -91,7 +91,11 @@ function App() {
   return (
     <div style={{ height: "100vh", width: "100vw", position: "relative" }}>
       {!dataReady && <div style={{ position: "absolute", top: 10, left: 10, background: "white", padding: "0.5rem" }}>Chargement des données...</div>}
-      <MapContainer center={[48.845, 2.29]} zoom={15} style={{ height: "100%", width: "100%" }}>
+      <MapContainer center={[48.845, 2.29]} 
+      zoom={17}            // 🔍 Zoom plus proche (15 par défaut) 
+      minZoom={13} maxZoom={20}         // 🧭 Permet de zoomer encore plus 
+      style={{ height: "100%", width: "100%" }}>
+
         <TileLayer
           attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
