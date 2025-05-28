@@ -1,14 +1,89 @@
+/* ─── React & React-Leaflet ──────────────────────────────── */
 import React, { useEffect, useState, useRef } from "react";
-import { MapContainer, TileLayer, GeoJSON, Popup } from "react-leaflet";
-import { supabase } from "./supabaseClient";
+import { MapContainer, TileLayer, GeoJSON, Popup, useMap } from "react-leaflet";
+
+/* ─── Leaflet de base ────────────────────────────────────── */
 import "leaflet/dist/leaflet.css";
+import * as L from "leaflet";
+
+/* ─── Plugins (chargés + exposent L.control.locate) ──────── */
+import "./leaflet-plugins";
+
+/* ─── Supabase + styles maison ───────────────────────────── */
+import { supabase } from "./supabaseClient";
 import "./App.css";
+
+
+function LocateButton() {
+  const map = useMap();
+
+  React.useEffect(() => {
+    // S'assurer que le plugin est disponible avant de l'utiliser
+    if (map && L.control && L.control.locate) {
+      const locateControl = L.control.locate({
+        position: "topleft",      // coin en haut à gauche
+        flyTo: true,              // anime le zoom
+        returnToPrevBounds: true, // retourne à la vue précédente quand désactivé
+        icon: 'fa fa-location-arrow', // icône Font Awesome (facultatif)
+        iconLoading: 'fa fa-spinner fa-spin', // icône durant le chargement
+        showPopup: true,          // afficher un popup à l'emplacement
+        strings: {
+          title: "Me localiser",  // texte au survol du bouton
+          popup: "Vous êtes ici",  // texte dans le popup
+          outsideMapBoundsMsg: "Vous semblez être en dehors des limites de la carte"
+        },
+        locateOptions: {
+          enableHighAccuracy: true, // utiliser le GPS si disponible
+          maxZoom: 18,              // zoom max lors de la localisation
+          watch: true               // suivre la position en continu
+        }
+      }).addTo(map);
+
+      // Activer automatiquement après le chargement (facultatif)
+      // setTimeout(() => locateControl.start(), 1000);
+
+      return () => locateControl.remove();   // nettoyage si le composant disparaît
+    } else {
+      console.warn("Le plugin LocateControl n'est pas correctement chargé");
+    }
+  }, [map]);
+
+  return null;   // rien à afficher dans le DOM React
+}
+
+function SearchBox() {
+  const map = useMap();
+
+  React.useEffect(() => {
+    const geocoder = L.Control.geocoder({
+      position: "bottomright",
+      defaultMarkGeocode: false,
+      placeholder: "Rechercher une adresse…",
+      geocoder: L.Control.Geocoder.nominatim({
+        geocodingQueryParams: { countrycodes: "fr" }   // favorise la France
+      })
+    })
+      .on("markgeocode", e => {
+        map.fitBounds(e.geocode.bbox);   // zoome sur le résultat
+      })
+      .addTo(map);
+
+    return () => geocoder.remove();      // nettoyage si le composant disparaît
+  }, [map]);
+
+  return null;   // rien à rendre dans le DOM React
+}
 
 function App() {
   const [buildings, setBuildings] = useState(null);
   const [prospected, setProspected] = useState([]);
   const [popupInfo, setPopupInfo] = useState(null);
   const [dataReady, setDataReady] = useState(false);
+  // types de prospection
+  const [prospectTypes, setProspectTypes]                 = useState([]);
+  const [newTypeName, setNewTypeName]                     = useState("");
+  const [selectedProspectType, setSelectedProspectType]   = useState(null);
+  const [filterType, setFilterType]                       = useState(null);
   const layerRefs = useRef({});
 
   const refresh = async () => {
@@ -58,25 +133,59 @@ function App() {
     loadBuildings();
   }, []);
 
+    useEffect(() => {
+  const loadProspectTypes = async () => {
+    const { data, error } = await supabase
+      .from("prospection_types")
+      .select("*")
+      .order("name", { ascending: true });
+    if (error) {
+      console.error("Erreur chargement types :", error);
+    } else {
+      setProspectTypes(data);
+    }
+  };
+  loadProspectTypes();
+}, []);
   const saveProspection = async (data) => {
+    // ─── 1) Empêche l’enregistrement si pas de type choisi ─────────────────────
+    if (!selectedProspectType) {
+      alert("➡️ Veuillez sélectionner un type de prospection avant.");
+      return;
+    }
+
+    // ─── 2) Vérifie si la prospection existe déjà en local ────────────────────
     const exists = prospected.find((p) => p.id_batiment === data.id_batiment);
-    const cleaned = {
-      id_batiment: data.id_batiment,
-      date: new Date(data.date).toISOString(),
-      bal: data.bal || null,
-      code_entree: data.code_entree || null,
-      infos: data.infos || null,
+
+    // ─── 3) Construit l’objet à envoyer en base, avec prospection_type_id ─────
+    const payload = {
+      id_batiment:   data.id_batiment,
+      date:          new Date(data.date).toISOString(),
+      bal:           data.bal || null,
+      code_entree:   data.code_entree || null,
+      infos:         data.infos || null,
+      prospection_type_id: selectedProspectType,
     };
 
+    // ─── 4) Envoie en base : update si existe, insert sinon ──────────────────
     if (exists) {
-      await supabase.from("prospections").update(cleaned).eq("id_batiment", cleaned.id_batiment);
+      await supabase
+        .from("prospections")
+        .update(payload)
+        .eq("id_batiment", payload.id_batiment);
     } else {
-      await supabase.from("prospections").insert([cleaned]);
+      await supabase
+        .from("prospections")
+        .insert([payload]);
     }
-    const updated = prospected.filter((p) => p.id_batiment !== cleaned.id_batiment);
-    const newProspected = [...updated, cleaned];
+
+    // ─── 5) Mets à jour ton état local et recolore la carte ───────────────────
+    const others       = prospected.filter((p) => p.id_batiment !== payload.id_batiment);
+    const newProspected = [...others, payload];
     setProspected(newProspected);
-    updateColor(cleaned.id_batiment, newProspected);
+    updateColor(payload.id_batiment, newProspected);
+
+    // ─── 6) Ferme le popup ─────────────────────────────────────────────────────
     setPopupInfo(null);
   };
 
@@ -87,19 +196,84 @@ function App() {
     updateColor(id_batiment, updated);
     setPopupInfo(null);
   };
-
+  useEffect(() => {
+    if (!dataReady) return;
+    // si un filtre est actif, ne passer à updateColor que la liste filtrée
+    const list = filterType
+      ? prospected.filter(p => p.prospection_type_id === filterType)
+      : prospected;
+    Object.keys(layerRefs.current).forEach(id =>
+      updateColor(id, list)
+    );
+  }, [filterType, prospected, dataReady]);
   return (
     <div style={{ height: "100vh", width: "100vw", position: "relative" }}>
       {!dataReady && <div style={{ position: "absolute", top: 10, left: 10, background: "white", padding: "0.5rem" }}>Chargement des données...</div>}
+      <div className="control-panel">
+    <div>
+      <label>Type :</label>
+      <select
+        value={selectedProspectType || ""}
+        onChange={e => setSelectedProspectType(Number(e.target.value))}
+      >
+        <option value="">-- Sélectionner --</option>
+        {prospectTypes.map(t => (
+          <option key={t.id} value={t.id}>{t.name}</option>
+        ))}
+      </select>
+
+      <input
+        type="text"
+        placeholder="Nouveau type…"
+        value={newTypeName}
+        onChange={e => setNewTypeName(e.target.value)}
+      />
+      <button 
+      disabled={!newTypeName.trim()}
+      onClick={async () => {
+        if (!newTypeName.trim()) return;
+        const { error } = await supabase
+          .from("prospection_types")
+          .insert({ name: newTypeName.trim() });
+        if (error) console.error("Création type :", error);
+        else {
+          setNewTypeName("");
+          const { data } = await supabase
+            .from("prospection_types")
+            .select("*")
+            .order("name", { ascending: true });
+          setProspectTypes(data);
+        }
+      }}>➕</button>
+    </div>
+
+    <div>
+      <label>Filtrer :</label>
+      <select
+        value={filterType || ""}
+        onChange={e => setFilterType(e.target.value ? Number(e.target.value) : null)}
+      >
+        <option value="">-- Tous --</option>
+        {prospectTypes.map(t => (
+          <option key={t.id} value={t.id}>{t.name}</option>
+        ))}
+      </select>
+    </div>
+  </div>
       <MapContainer center={[48.845, 2.29]} 
       zoom={17}            // 🔍 Zoom plus proche (15 par défaut) 
-      minZoom={13} maxZoom={20}         // 🧭 Permet de zoomer encore plus 
+      minZoom={13} maxZoom={18}         // 🧭 Permet de zoomer encore plus 
       style={{ height: "100%", width: "100%" }}>
 
         <TileLayer
-          attribution='&copy; OpenStreetMap contributors'
+          attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a> contributors"
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
+        <SearchBox />      {/* <- la loupe apparaît en haut à gauche */}
+        <LocateButton />   {/* <- le bouton de localisation apparaît en haut à gauche */}
+
+        
+        
         {buildings && dataReady && (
           <GeoJSON
             data={buildings}
@@ -129,6 +303,33 @@ function App() {
                   code_entree: found?.code_entree || "",
                   infos: found?.infos || "",
                 });
+              });
+            }}
+          />
+        )}
+          {buildings && dataReady && (
+          <GeoJSON
+            key={selectedProspectType}        // ← ici !
+            data={buildings}
+            onEachFeature={(feature, layer) => {
+              const id = feature.id || feature.properties["@id"];
+              layerRefs.current[id] = layer;
+              updateColor(id);
+
+              layer.on("click", async () => {
+                const today = new Date().toISOString();
+                // cette closure “voit” maintenant le bon selectedProspectType
+                await saveProspection({
+                  id_batiment:   id,
+                  date:          today,
+                  bal:           null,
+                  code_entree:   null,
+                  infos:         null,
+                });
+              });
+
+              layer.on("contextmenu", (e) => {
+                /* votre popup d’édition… */
               });
             }}
           />

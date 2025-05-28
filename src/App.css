@@ -1,3 +1,6 @@
+@import "leaflet-control-geocoder/dist/Control.Geocoder.css";
+@import "leaflet.locatecontrol/dist/L.Control.Locate.css";
+
 .App {
   text-align: center;
 }
@@ -36,3 +39,32 @@
     transform: rotate(360deg);
   }
 }
+
+/* ─── Panneau de sélection et de filtre ─────────────────────── */
+.control-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: white;
+  padding: 0.5rem;
+  z-index: 1000;
+  font-size: 0.9rem;
+  border-radius: 4px;
+  box-shadow: 0 0 6px rgba(0,0,0,0.15);
+}
+.control-panel div {
+  margin-bottom: 0.5rem;
+}
+.control-panel label {
+  margin-right: 0.25rem;
+}
+.control-panel select,
+.control-panel input,
+.control-panel button {
+  margin-left: 0.25rem;
+  font-size: 0.9rem;
+}
+.control-panel button {
+  cursor: pointer;
+}
+/* ───────────────────────────────────────────────────────────── */

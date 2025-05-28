@@ -68,3 +68,20 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+
+## Create GeoJSON Map
+https://overpass-turbo.eu/
+
+## Améliorations 
+<!-- Un fond de carte avec tous les numéros de rue
+Se localiser en direct
+Permettre de selectionner un type propection pour savoir quel flyer j'ai mis à quel endroit et donc avoir un filtre par type de prospections
+Un mode prospection et un mode édition ( à réflechir dans le fonctionnement)
+Pouvoir choisir un secteur et que nos clics puissent être fait que dans ce secteur
+Avoir une option par bâtiment pour indiquer clairement les bâtiments sociaux
+Afficher les bâtiments inaccessible, uniquement code, badge ne fonctionne pas, pas accessible
+Ajouter des filtres, par temps de prospection, ou pour permettre de visualiser le nombre de boite au lettre
+Trouver un moyen d'afficher les codes d'accès des bâtiments sur la carte directement (peut-etre en mode prospection on peut choisir de les afficher)
+Ajouter une authentification pour sécuriser l'accès et avoir un historique des actions de chacun
+Ajouter un mode édition de géométrie pour pouvoir redécouper certain bâtiment qui sont parfois considérer comme un seul bloc -->
