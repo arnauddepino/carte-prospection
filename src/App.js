@@ -276,60 +276,35 @@ function App() {
         
         {buildings && dataReady && (
           <GeoJSON
+            key={selectedProspectType}      // force le remount quand on change de type
             data={buildings}
             onEachFeature={(feature, layer) => {
               const id = feature.id || feature.properties["@id"];
               layerRefs.current[id] = layer;
               updateColor(id);
 
+              // clic gauche : enregistre la prospection
               layer.on("click", async () => {
-                const today = new Date().toISOString();
                 await saveProspection({
                   id_batiment: id,
-                  date: today,
-                  bal: null,
+                  date:        new Date().toISOString(),
+                  bal:         null,
                   code_entree: null,
-                  infos: null,
+                  infos:       null,
                 });
               });
 
+              // clic droit : ouvre le popup d'édition
               layer.on("contextmenu", (e) => {
-                const found = prospected.find((p) => p.id_batiment === id);
+                const found = prospected.find(p => p.id_batiment === id);
                 setPopupInfo({
                   id_batiment: id,
-                  latlng: e.latlng,
-                  date: found?.date || new Date().toISOString(),
-                  bal: found?.bal || "",
+                  latlng:      e.latlng,
+                  date:        found?.date || new Date().toISOString(),
+                  bal:         found?.bal  || "",
                   code_entree: found?.code_entree || "",
-                  infos: found?.infos || "",
+                  infos:       found?.infos || "",
                 });
-              });
-            }}
-          />
-        )}
-          {buildings && dataReady && (
-          <GeoJSON
-            key={selectedProspectType}        // ← ici !
-            data={buildings}
-            onEachFeature={(feature, layer) => {
-              const id = feature.id || feature.properties["@id"];
-              layerRefs.current[id] = layer;
-              updateColor(id);
-
-              layer.on("click", async () => {
-                const today = new Date().toISOString();
-                // cette closure “voit” maintenant le bon selectedProspectType
-                await saveProspection({
-                  id_batiment:   id,
-                  date:          today,
-                  bal:           null,
-                  code_entree:   null,
-                  infos:         null,
-                });
-              });
-
-              layer.on("contextmenu", (e) => {
-                /* votre popup d’édition… */
               });
             }}
           />
