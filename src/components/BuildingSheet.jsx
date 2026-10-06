@@ -18,6 +18,7 @@ export default function BuildingSheet({
   record,
   types,
   selectedType,
+  pendingPassages = [],
   onSaveFiche,
   onAddPassage,
   onDeletePassage,
@@ -27,6 +28,7 @@ export default function BuildingSheet({
   const [form, setForm] = useState(() => recordToForm(building.id, record));
   const [address, setAddress] = useState(osmLabel(building.properties));
   const [passages, setPassages] = useState(null); // null = chargement
+  const [historyError, setHistoryError] = useState(false);
   const [newPassage, setNewPassage] = useState(() => ({
     date: toDateInputValue(new Date().toISOString()),
     typeId: selectedType,
@@ -48,8 +50,9 @@ export default function BuildingSheet({
   }, [building]);
 
   const loadPassages = useCallback(async () => {
-    const { data } = await fetchPassages(building.id);
+    const { data, error } = await fetchPassages(building.id);
     setPassages(data);
+    setHistoryError(Boolean(error));
   }, [building.id]);
 
   // Historique, rechargé quand la fiche change (passage d'un collègue compris).
@@ -183,13 +186,35 @@ export default function BuildingSheet({
             </button>
           </form>
 
+          {pendingPassages.length > 0 && (
+            <ul className="passages">
+              {pendingPassages.map((p) => (
+                <li key={p.client_id}>
+                  <div>
+                    <strong>{longDate(p.date)}</strong>
+                    <span>
+                      {[typeName(p.prospection_type_id) ?? "Sans type", p.auteur && `par ${p.auteur}`]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </span>
+                  </div>
+                  <span className="badge">En attente d’envoi</span>
+                </li>
+              ))}
+            </ul>
+          )}
+
           {passages === null ? (
             <p className="hint">Chargement de l’historique…</p>
-          ) : passages.length === 0 ? (
+          ) : historyError ? (
+            <p className="hint">Historique indisponible sans réseau.</p>
+          ) : passages.length === 0 && pendingPassages.length === 0 ? (
             <p className="hint">Aucun passage enregistré.</p>
           ) : (
             <ul className="passages">
-              {passages.map((p) => (
+              {passages
+                .filter((p) => !pendingPassages.some((q) => q.client_id === p.client_id))
+                .map((p) => (
                 <li key={p.id}>
                   <div>
                     <strong>{longDate(p.date)}</strong>

@@ -4,6 +4,11 @@ import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import App from "./App";
 
+// Mode hors ligne (en production uniquement, pour ne pas gêner le développement).
+if (import.meta.env.PROD && "serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js"));
+}
+
 createRoot(document.getElementById("root")).render(
   <StrictMode>
     <App />

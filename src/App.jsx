@@ -17,6 +17,7 @@ import BuildingSheet from "./components/BuildingSheet";
 import IdentitySheet from "./components/IdentitySheet";
 import SearchBar from "./components/SearchBar";
 import SettingsSheet from "./components/SettingsSheet";
+import SyncStatus from "./components/SyncStatus";
 import Toasts from "./components/Toasts";
 
 const BUILDINGS_URL = `${import.meta.env.BASE_URL}batiments-15e.geojson`;
@@ -61,7 +62,23 @@ function ProspectionMap() {
   const [map, setMap] = useState(null);
   const [buildings, setBuildings] = useState(null);
   const [buildingsError, setBuildingsError] = useState(false);
-  const { records, status, reload, addPassage, deletePassage, saveFiche, removeFiche } = useProspections();
+  const { toasts, show, dismiss } = useToasts();
+  const {
+    records,
+    status,
+    offline,
+    syncing,
+    pending,
+    reload,
+    flush,
+    addPassage,
+    undoPassage,
+    saveFiche,
+    removeFiche,
+    deletePassage,
+  } = useProspections({
+    onFatal: () => show({ kind: "error", text: "Une modification a été refusée par le serveur et annulée." }),
+  });
   const { types, create: createType } = useProspectTypes();
   const [mode, setMode] = useStoredState("prospection.mode", "prospect");
   const [storedType, setSelectedType] = useStoredState("prospection.type", null);
@@ -70,7 +87,6 @@ function ProspectionMap() {
   const [editingAuteur, setEditingAuteur] = useState(false);
   const [sheet, setSheet] = useState(null); // null | { kind: "building", building } | { kind: "settings" }
   const [searchPoint, setSearchPoint] = useState(null);
-  const { toasts, show, dismiss } = useToasts();
   const locate = useLocate(map);
   const typeSelectRef = useRef(null);
   const now = useNow();
@@ -120,14 +136,8 @@ function ProspectionMap() {
     [map]
   );
 
-  // Annuler un tap = supprimer le passage ; la fiche revient au précédent.
-  const undoPassage = useCallback(
-    async (passage) => {
-      const { error } = await deletePassage(passage);
-      show(error ? { kind: "error", text: `Annulation impossible. ${NETWORK_HINT}` } : { kind: "info", text: "Passage annulé" });
-    },
-    [deletePassage, show]
-  );
+  // Hors ligne, les modifications partent dès le retour du réseau.
+  const later = offline ? " (envoi au retour du réseau)" : "";
 
   const handleTap = useCallback(
     async (building) => {
@@ -146,45 +156,42 @@ function ProspectionMap() {
         return;
       }
 
-      const { error, passage } = await addPassage(
-        passagePayload({ id_batiment: building.id, typeId: selectedType, auteur })
-      );
-      if (error) {
-        show({ kind: "error", text: `Passage non enregistré. ${NETWORK_HINT}` });
-        return;
-      }
+      // Le bâtiment se colore tout de suite ; l'envoi se fait en arrière-plan.
+      const handle = addPassage(passagePayload({ id_batiment: building.id, typeId: selectedType, auteur }));
       navigator.vibrate?.(20);
       show({
         kind: "success",
         text: `✓ Prospecté · ${types.find((t) => t.id === selectedType)?.name}`,
-        action: { label: "Annuler", run: () => undoPassage(passage) },
+        action: {
+          label: "Annuler",
+          run: () => {
+            undoPassage(handle);
+            show({ kind: "info", text: "Passage annulé" });
+          },
+        },
       });
     },
-    [mode, selectedType, auteur, types, addPassage, show, openBuilding, undoPassage]
+    [mode, selectedType, auteur, types, addPassage, undoPassage, show, openBuilding]
   );
 
-  const handleSaveFiche = async (form) => {
-    const { error } = await saveFiche(formToPayload(form));
-    show(error ? { kind: "error", text: `Fiche non enregistrée. ${NETWORK_HINT}` } : { kind: "success", text: "✓ Fiche enregistrée" });
+  const handleSaveFiche = (form) => {
+    saveFiche(formToPayload(form));
+    show({ kind: "success", text: `✓ Fiche enregistrée${later}` });
   };
 
-  const handleAddPassage = async (id_batiment, { date, typeId }) => {
-    const { error } = await addPassage(passagePayload({ id_batiment, date, typeId, auteur }));
-    show(error ? { kind: "error", text: `Passage non enregistré. ${NETWORK_HINT}` } : { kind: "success", text: "✓ Passage ajouté" });
+  const handleAddPassage = (id_batiment, { date, typeId }) => {
+    addPassage(passagePayload({ id_batiment, date, typeId, auteur }));
+    show({ kind: "success", text: `✓ Passage ajouté${later}` });
   };
 
   const handleDeletePassage = async (passage) => {
     const { error } = await deletePassage(passage);
-    show(error ? { kind: "error", text: `Suppression impossible. ${NETWORK_HINT}` } : { kind: "info", text: "Passage supprimé" });
+    show(error ? { kind: "error", text: `Suppression impossible sans réseau. ${NETWORK_HINT}` } : { kind: "info", text: "Passage supprimé" });
   };
 
-  const handleDeleteFiche = async (id_batiment) => {
-    const { error } = await removeFiche(id_batiment);
-    if (error) {
-      show({ kind: "error", text: `Suppression impossible. ${NETWORK_HINT}` });
-      return;
-    }
-    show({ kind: "info", text: "Fiche et historique supprimés" });
+  const handleDeleteFiche = (id_batiment) => {
+    removeFiche(id_batiment);
+    show({ kind: "info", text: `Fiche et historique supprimés${later}` });
     setSheet(null);
   };
 
@@ -228,11 +235,13 @@ function ProspectionMap() {
         preferCanvas
         className="map"
       >
-        {/* Zoom 19 : le fond OSM y affiche les numéros de rue. */}
+        {/* Zoom 19 : le fond OSM y affiche les numéros de rue. crossOrigin : tuiles
+            gardables hors ligne par le service worker. */}
         <TileLayer
           attribution="&copy; <a href='https://www.openstreetmap.org/copyright'>OpenStreetMap</a>"
           url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
           maxZoom={19}
+          crossOrigin="anonymous"
         />
         {ready && (
           <BuildingsLayer
@@ -280,6 +289,7 @@ function ProspectionMap() {
       )}
       {!ready && !buildingsError && !status.error && <div className="status-banner">Chargement des données…</div>}
 
+      <SyncStatus offline={offline} syncing={syncing} pending={pending.length} onRetry={flush} />
       <Toasts toasts={toasts} onDismiss={dismiss} />
 
       {sheet?.kind === "building" && (
@@ -289,6 +299,9 @@ function ProspectionMap() {
           record={records.get(sheet.building.id)}
           types={types}
           selectedType={selectedType}
+          pendingPassages={pending
+            .filter((op) => op.type === "passage" && op.payload.id_batiment === sheet.building.id)
+            .map((op) => op.payload)}
           onSaveFiche={handleSaveFiche}
           onAddPassage={(p) => handleAddPassage(sheet.building.id, p)}
           onDeletePassage={handleDeletePassage}

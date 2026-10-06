@@ -59,7 +59,7 @@ modifier et supprimer les données, y compris les codes d'entrée.
   [!] Tester sur le terrain (GPS, vibration, lisibilité au soleil)
 
 
-ÉTAPE 4 — DONNÉES ET COLLABORATION ................ PRÊTE, À METTRE EN LIGNE
+ÉTAPE 4 — DONNÉES ET COLLABORATION .............................. EN LIGNE
 --------------------------------------------------------------------------
   [x] Historique des passages (date, type, prénom) dans la fiche,
       avec ajout d'un passage daté et suppression d'un passage
@@ -76,14 +76,25 @@ modifier et supprimer les données, y compris les codes d'entrée.
   [~] Adresses : affichées dans la fiche ; reste à les inclure dans l'export
   [x] Tests : 35 tests unitaires, 20 vérifications de la migration sur une
       copie locale de la base, 31 vérifications de bout en bout
-  [!] Exécuter la migration 03 dans Supabase (SQL Editor), PUIS mettre en ligne
+  [x] Migration 03 appliquée (711 fiches -> 711 passages repris) et mise en
+      ligne (commit 8aba19f)
   [!] Vérifier le temps réel avec deux téléphones
 
 
-ÉTAPE 5 — ALLER PLUS LOIN ....................................... À FAIRE
+ÉTAPE 5 — ALLER PLUS LOIN ...................................... EN COURS
 --------------------------------------------------------------------------
-  [ ] Mode hors ligne (halls, sous-sols) avec envoi au retour du réseau
-  [ ] Secteurs : attribution par collègue, progression en %
+  [x] Mode hors ligne (halls, sous-sols) — PRÊT, À METTRE EN LIGNE :
+      la carte s'ouvre sans réseau (appli, bâtiments, tuiles déjà vues) ;
+      taps, fiches et annulations enregistrés sur le téléphone puis envoyés
+      au retour du réseau ; pastille « Hors ligne · N en attente » ; aucun
+      doublon si une réponse se perd (identifiant de passage, migration 04)
+      Tests : 47 tests unitaires, 25 vérifications hors ligne avec vraie
+      coupure, 31 vérifications de l'étape 4 sans régression
+  [!] Exécuter la migration 04 dans Supabase (SQL Editor), PUIS mettre en ligne
+  [!] Tester sur le terrain : ouvrir la carte une fois avec du réseau, puis
+      prospecter dans un hall ou un sous-sol
+  [ ] Secteurs dessinés sur la carte (choix validé), attribution par
+      collègue, progression en %
   [ ] Préparer une tournée : nombre de BAL donc de flyers à prévoir
   [ ] Tableau de bord : flyers par semaine, par collègue, par type
   [ ] Retour sur investissement : relier les contacts reçus aux campagnes
@@ -100,5 +111,8 @@ JOURNAL
             Sauvegarde des tables dans sauvegardes/ (non publiée sur GitHub).
 2026-10-06  Étape 3 en ligne (commit 5078403 ; choix : mode Prospecter /
             Éditer, palette bleue pour daltoniens).
-2026-10-07  Étape 4 réalisée (choix : prénom sans compte, 5 statuts d'accès
-            + logement social). Migration 03 prête, en attente.
+2026-10-07  Étape 4 en ligne (commit 8aba19f ; choix : prénom sans compte,
+            5 statuts d'accès + logement social). Migration 03 appliquée,
+            abonnement temps réel vérifié.
+2026-10-08  Étape 5 — mode hors ligne réalisé (choix : hors ligne seul dans ce
+            tour ; secteurs à dessiner plus tard). Migration 04 prête.

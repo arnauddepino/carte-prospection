@@ -459,7 +459,7 @@ textarea {
 }
 /* Fiche ouverte : les notifications passent en haut pour ne pas cacher les champs. */
 .has-sheet .toasts {
-  top: calc(72px + var(--safe-top));
+  top: calc(112px + var(--safe-top));
   bottom: auto;
 }
 .toast {
@@ -638,4 +638,54 @@ textarea {
 .dialog h2 {
   margin: 0;
   font-size: 20px;
+}
+
+/* ─── Mode hors ligne : état de la file d'envoi ────────────── */
+.sync-pill {
+  position: absolute;
+  z-index: 1000;
+  top: calc(68px + var(--safe-top));
+  left: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  min-height: 36px;
+  box-sizing: border-box;
+  padding: 0 4px 0 12px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  font-size: 14px;
+  font-weight: 600;
+}
+.sync-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.sync-pill.is-offline .sync-dot {
+  background: var(--muted);
+}
+.sync-pill button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.badge {
+  flex: none;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-2);
 }

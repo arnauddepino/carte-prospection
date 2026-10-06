@@ -19,6 +19,10 @@ localisation, légende et filtres. Recherche d'adresse en haut.
 - **Légende et filtres** : filtres par type, collègue, ancienneté, code connu,
   inaccessibles, logements sociaux ; export CSV (fiches et historique) pour Excel.
 - **Temps réel** : les passages des collègues apparaissent sans recharger la page.
+- **Hors ligne** : après une première ouverture avec réseau, la carte s'ouvre sans réseau.
+  Taps et fiches sont enregistrés sur le téléphone puis envoyés automatiquement au
+  retour du réseau (pastille « Hors ligne · N modifications en attente » en haut à gauche).
+  L'historique d'une fiche, la recherche d'adresse et l'export nécessitent le réseau.
 - **Couleurs** : du bleu le plus foncé (passage de moins de 7 jours) au plus clair
   (plus de 90 jours) ; gris discret = jamais prospecté. Légende dans « Légende et filtres ».
 
@@ -39,10 +43,11 @@ src/
   App.jsx                  assemblage : carte, modes, fiches, notifications
   components/              BuildingsLayer, BottomBar, BuildingSheet, SettingsSheet,
                            IdentitySheet, SearchBar, Toasts, Icon
-  hooks/                   useProspections, useProspectTypes, useStoredState, useNow,
-                           useToasts, useLocate
+  hooks/                   useProspections (fiches, temps réel, file d'envoi hors ligne),
+                           useProspectTypes, useStoredState, useNow, useToasts, useLocate
   lib/                     logique pure et testée : couleurs, dates, données, filtres,
-                           adresses, export CSV
+                           file d'envoi (outbox), adresses, export CSV
+public/sw.js               service worker : appli, bâtiments et tuiles disponibles hors ligne
 supabase/migrations/       historique des modifications de la base
 public/
   batiments-15e.geojson    bâtiments OSM du 15e (allégé : identifiant, nom, adresse)

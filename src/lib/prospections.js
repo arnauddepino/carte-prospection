@@ -55,6 +55,7 @@ export function formToPayload(form) {
 // la fiche est placée à midi pour rester sur le bon jour.
 export function passagePayload({ id_batiment, date, typeId, auteur }) {
   return {
+    client_id: crypto.randomUUID(), // identifiant stable, même hors ligne (évite les doublons au renvoi)
     id_batiment,
     date: date ? fromDateInputValue(date) : new Date().toISOString(),
     prospection_type_id: typeId,
