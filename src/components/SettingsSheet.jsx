@@ -1,21 +1,34 @@
 import { useState } from "react";
 import { AGE_STEPS, NEVER_COLOR, styleFor } from "../lib/colors";
+import { hasFilters, NO_FILTERS } from "../lib/prospections";
 import Icon from "./Icon";
 
 const LEGEND = [...AGE_STEPS, { color: NEVER_COLOR, label: "Jamais prospecté" }];
 
-function Swatch({ color }) {
-  const { fillColor, fillOpacity, color: stroke } = styleFor(color);
+function Swatch({ color, inaccessible = false }) {
+  const { fillColor, fillOpacity, color: stroke, dashArray } = styleFor(color, { inaccessible });
   return (
-    <span className="swatch" style={{ borderColor: stroke }} aria-hidden="true">
+    <span className={`swatch${dashArray ? " dashed" : ""}`} style={{ borderColor: stroke }} aria-hidden="true">
       <span style={{ background: fillColor, opacity: fillOpacity }} />
     </span>
   );
 }
 
-// Légende des couleurs, filtre par type et création de types.
-export default function SettingsSheet({ types, filterType, onFilterType, onCreateType, onClose }) {
+// Légende, filtres d'affichage, types de prospection, export et prénom.
+export default function SettingsSheet({
+  types,
+  auteurs,
+  filters,
+  onFilters,
+  onCreateType,
+  onExport,
+  auteur,
+  onChangeAuteur,
+  onClose,
+}) {
   const [newTypeName, setNewTypeName] = useState("");
+  const set = (patch) => onFilters({ ...filters, ...patch });
+  const toId = (value) => (value ? Number(value) : null);
 
   const create = async (e) => {
     e.preventDefault();
@@ -43,24 +56,67 @@ export default function SettingsSheet({ types, filterType, onFilterType, onCreat
               {step.label}
             </li>
           ))}
+          <li>
+            <Swatch color={AGE_STEPS[2].color} inaccessible />
+            Contour en pointillés : inaccessible
+          </li>
         </ul>
 
-        <h3>Afficher</h3>
+        <h3>Filtres</h3>
         <div className="field">
-          <select
-            aria-label="Filtrer par type de prospection"
-            value={filterType ?? ""}
-            onChange={(e) => onFilterType(e.target.value ? Number(e.target.value) : null)}
-          >
+          <label htmlFor="flt-type">Type de prospection</label>
+          <select id="flt-type" value={filters.typeId ?? ""} onChange={(e) => set({ typeId: toId(e.target.value) })}>
             <option value="">Tous les types</option>
             {types.map((t) => (
               <option key={t.id} value={t.id}>
-                {t.name} uniquement
+                {t.name}
               </option>
             ))}
           </select>
-          {filterType && <p className="hint">Les bâtiments d’un autre type apparaissent en gris.</p>}
         </div>
+        <div className="field-pair">
+          <div className="field">
+            <label htmlFor="flt-auteur">Dernier passage par</label>
+            <select id="flt-auteur" value={filters.auteur ?? ""} onChange={(e) => set({ auteur: e.target.value || null })}>
+              <option value="">Tout le monde</option>
+              {auteurs.map((a) => (
+                <option key={a} value={a}>
+                  {a}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="field">
+            <label htmlFor="flt-age">Ancienneté</label>
+            <select id="flt-age" value={filters.age ?? ""} onChange={(e) => set({ age: e.target.value || null })}>
+              <option value="">Toutes</option>
+              <option value="recent">Moins de 30 jours</option>
+              <option value="a-refaire">À refaire (30 jours et +)</option>
+            </select>
+          </div>
+        </div>
+        <div className="checkboxes">
+          <label className="checkbox">
+            <input type="checkbox" checked={filters.avecCode} onChange={(e) => set({ avecCode: e.target.checked })} />
+            Avec code connu
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={filters.inaccessible} onChange={(e) => set({ inaccessible: e.target.checked })} />
+            Inaccessibles
+          </label>
+          <label className="checkbox">
+            <input type="checkbox" checked={filters.social} onChange={(e) => set({ social: e.target.checked })} />
+            Logements sociaux
+          </label>
+        </div>
+        {hasFilters(filters) && (
+          <>
+            <p className="hint">Les bâtiments qui ne correspondent pas aux filtres sont estompés.</p>
+            <button type="button" className="button secondary" onClick={() => onFilters(NO_FILTERS)}>
+              Effacer les filtres
+            </button>
+          </>
+        )}
 
         <h3>Nouveau type de prospection</h3>
         <form className="field-inline" onSubmit={create}>
@@ -75,6 +131,24 @@ export default function SettingsSheet({ types, filterType, onFilterType, onCreat
             Créer
           </button>
         </form>
+
+        <h3>Exporter (Excel / CSV)</h3>
+        <div className="field-inline">
+          <button type="button" className="button secondary grow" onClick={() => onExport("fiches")}>
+            Fiches
+          </button>
+          <button type="button" className="button secondary grow" onClick={() => onExport("passages")}>
+            Historique
+          </button>
+        </div>
+
+        <h3>Vous</h3>
+        <div className="field-inline identity-row">
+          <span>{auteur}</span>
+          <button type="button" className="button secondary" onClick={onChangeAuteur}>
+            Changer de prénom
+          </button>
+        </div>
       </div>
     </section>
   );

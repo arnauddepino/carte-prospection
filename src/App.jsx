@@ -1,18 +1,20 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CircleMarker, MapContainer, TileLayer } from "react-leaflet";
 
 import { supabase } from "./supabaseClient";
-import { useProspections } from "./hooks/useProspections";
+import { fetchPassages, useProspections } from "./hooks/useProspections";
 import { useProspectTypes } from "./hooks/useProspectTypes";
 import { useStoredState } from "./hooks/useStoredState";
 import { useNow } from "./hooks/useNow";
 import { useToasts } from "./hooks/useToasts";
 import { useLocate } from "./hooks/useLocate";
-import { formToPayload } from "./lib/prospections";
+import { downloadText, fichesCsv, passagesCsv } from "./lib/csv";
+import { featureId, formToPayload, hasFilters, NO_FILTERS, passagePayload } from "./lib/prospections";
 
 import BuildingsLayer from "./components/BuildingsLayer";
 import BottomBar from "./components/BottomBar";
 import BuildingSheet from "./components/BuildingSheet";
+import IdentitySheet from "./components/IdentitySheet";
 import SearchBar from "./components/SearchBar";
 import SettingsSheet from "./components/SettingsSheet";
 import Toasts from "./components/Toasts";
@@ -40,15 +42,32 @@ function revealAboveSheet(map, latlng) {
   if (point.y > target * 1.6) map.panBy([0, point.y - target]);
 }
 
+// Centre approximatif de chaque bâtiment (pour l'export).
+function buildingCenters(buildings) {
+  const centers = new Map();
+  for (const feature of buildings?.features ?? []) {
+    let ring = feature.geometry.coordinates;
+    while (Array.isArray(ring[0][0])) ring = ring[0];
+    const lng = ring.reduce((s, p) => s + p[0], 0) / ring.length;
+    const lat = ring.reduce((s, p) => s + p[1], 0) / ring.length;
+    centers.set(featureId(feature), [lat, lng]);
+  }
+  return centers;
+}
+
+const today = () => new Date().toISOString().slice(0, 10);
+
 function ProspectionMap() {
   const [map, setMap] = useState(null);
   const [buildings, setBuildings] = useState(null);
   const [buildingsError, setBuildingsError] = useState(false);
-  const { records, status, reload, save, remove } = useProspections();
+  const { records, status, reload, addPassage, deletePassage, saveFiche, removeFiche } = useProspections();
   const { types, create: createType } = useProspectTypes();
   const [mode, setMode] = useStoredState("prospection.mode", "prospect");
   const [storedType, setSelectedType] = useStoredState("prospection.type", null);
-  const [storedFilter, setFilterType] = useStoredState("prospection.filtre", null);
+  const [storedFilters, setFilters] = useStoredState("prospection.filtres", NO_FILTERS);
+  const [auteur, setAuteur] = useStoredState("prospection.auteur", null);
+  const [editingAuteur, setEditingAuteur] = useState(false);
   const [sheet, setSheet] = useState(null); // null | { kind: "building", building } | { kind: "settings" }
   const [searchPoint, setSearchPoint] = useState(null);
   const { toasts, show, dismiss } = useToasts();
@@ -58,7 +77,17 @@ function ProspectionMap() {
 
   // Un type mémorisé peut avoir été supprimé entre-temps.
   const selectedType = types.some((t) => t.id === storedType) ? storedType : null;
-  const filterType = types.some((t) => t.id === storedFilter) ? storedFilter : null;
+  const filters = useMemo(() => {
+    const f = { ...NO_FILTERS, ...storedFilters };
+    return types.length && f.typeId && !types.some((t) => t.id === f.typeId) ? { ...f, typeId: null } : f;
+  }, [storedFilters, types]);
+
+  // Prénoms connus, pour le filtre « Dernier passage par ».
+  const auteurs = useMemo(() => {
+    const names = new Set([...records.values()].map((r) => r.dernier_auteur).filter(Boolean));
+    if (auteur) names.add(auteur);
+    return [...names].sort((a, b) => a.localeCompare(b, "fr"));
+  }, [records, auteur]);
 
   const loadBuildings = useCallback(async () => {
     setBuildingsError(false);
@@ -91,16 +120,13 @@ function ProspectionMap() {
     [map]
   );
 
-  // Annule un tap : remet la date et le type d'avant, ou supprime la ligne
-  // si le bâtiment n'avait jamais été prospecté.
-  const undoTap = useCallback(
-    async (id_batiment, previous) => {
-      const { error } = previous
-        ? await save({ id_batiment, date: previous.date, prospection_type_id: previous.prospection_type_id })
-        : await remove(id_batiment);
+  // Annuler un tap = supprimer le passage ; la fiche revient au précédent.
+  const undoPassage = useCallback(
+    async (passage) => {
+      const { error } = await deletePassage(passage);
       show(error ? { kind: "error", text: `Annulation impossible. ${NETWORK_HINT}` } : { kind: "info", text: "Passage annulé" });
     },
-    [save, remove, show]
+    [deletePassage, show]
   );
 
   const handleTap = useCallback(
@@ -120,12 +146,9 @@ function ProspectionMap() {
         return;
       }
 
-      const previous = records.get(building.id);
-      const { error } = await save({
-        id_batiment: building.id,
-        date: new Date().toISOString(),
-        prospection_type_id: selectedType,
-      });
+      const { error, passage } = await addPassage(
+        passagePayload({ id_batiment: building.id, typeId: selectedType, auteur })
+      );
       if (error) {
         show({ kind: "error", text: `Passage non enregistré. ${NETWORK_HINT}` });
         return;
@@ -134,34 +157,34 @@ function ProspectionMap() {
       show({
         kind: "success",
         text: `✓ Prospecté · ${types.find((t) => t.id === selectedType)?.name}`,
-        action: { label: "Annuler", run: () => undoTap(building.id, previous) },
+        action: { label: "Annuler", run: () => undoPassage(passage) },
       });
     },
-    [mode, selectedType, records, save, show, openBuilding, undoTap, types]
+    [mode, selectedType, auteur, types, addPassage, show, openBuilding, undoPassage]
   );
 
-  const handleSave = async (form) => {
-    const payload = formToPayload(form, null);
-    if (!payload) {
-      show({ kind: "info", text: "Choisissez le type de prospection." });
-      return;
-    }
-    const { error } = await save(payload);
-    if (error) {
-      show({ kind: "error", text: `Fiche non enregistrée. ${NETWORK_HINT}` });
-      return;
-    }
-    show({ kind: "success", text: "✓ Fiche enregistrée" });
-    setSheet(null);
+  const handleSaveFiche = async (form) => {
+    const { error } = await saveFiche(formToPayload(form));
+    show(error ? { kind: "error", text: `Fiche non enregistrée. ${NETWORK_HINT}` } : { kind: "success", text: "✓ Fiche enregistrée" });
   };
 
-  const handleDelete = async (id_batiment) => {
-    const { error } = await remove(id_batiment);
+  const handleAddPassage = async (id_batiment, { date, typeId }) => {
+    const { error } = await addPassage(passagePayload({ id_batiment, date, typeId, auteur }));
+    show(error ? { kind: "error", text: `Passage non enregistré. ${NETWORK_HINT}` } : { kind: "success", text: "✓ Passage ajouté" });
+  };
+
+  const handleDeletePassage = async (passage) => {
+    const { error } = await deletePassage(passage);
+    show(error ? { kind: "error", text: `Suppression impossible. ${NETWORK_HINT}` } : { kind: "info", text: "Passage supprimé" });
+  };
+
+  const handleDeleteFiche = async (id_batiment) => {
+    const { error } = await removeFiche(id_batiment);
     if (error) {
       show({ kind: "error", text: `Suppression impossible. ${NETWORK_HINT}` });
       return;
     }
-    show({ kind: "info", text: "Prospection supprimée" });
+    show({ kind: "info", text: "Fiche et historique supprimés" });
     setSheet(null);
   };
 
@@ -173,6 +196,16 @@ function ProspectionMap() {
         : { kind: "success", text: `✓ Type « ${name} » créé` }
     );
     return result;
+  };
+
+  const handleExport = async (what) => {
+    if (what === "fiches") {
+      downloadText(`prospection-fiches-${today()}.csv`, fichesCsv(records, types, buildingCenters(buildings)));
+      return;
+    }
+    const { data, error } = await fetchPassages();
+    if (error) show({ kind: "error", text: `Export impossible. ${NETWORK_HINT}` });
+    else downloadText(`prospection-historique-${today()}.csv`, passagesCsv(data, types));
   };
 
   const changeMode = (next) => {
@@ -205,7 +238,7 @@ function ProspectionMap() {
           <BuildingsLayer
             buildings={buildings}
             records={records}
-            filterType={filterType}
+            filters={filters}
             now={now}
             selectedId={selectedId}
             onTap={handleTap}
@@ -256,17 +289,23 @@ function ProspectionMap() {
           record={records.get(sheet.building.id)}
           types={types}
           selectedType={selectedType}
-          onSave={handleSave}
-          onDelete={() => handleDelete(sheet.building.id)}
+          onSaveFiche={handleSaveFiche}
+          onAddPassage={(p) => handleAddPassage(sheet.building.id, p)}
+          onDeletePassage={handleDeletePassage}
+          onDeleteFiche={() => handleDeleteFiche(sheet.building.id)}
           onClose={() => setSheet(null)}
         />
       )}
       {sheet?.kind === "settings" && (
         <SettingsSheet
           types={types}
-          filterType={filterType}
-          onFilterType={setFilterType}
+          auteurs={auteurs}
+          filters={filters}
+          onFilters={setFilters}
           onCreateType={handleCreateType}
+          onExport={handleExport}
+          auteur={auteur}
+          onChangeAuteur={() => setEditingAuteur(true)}
           onClose={() => setSheet(null)}
         />
       )}
@@ -280,9 +319,20 @@ function ProspectionMap() {
         typeSelectRef={typeSelectRef}
         locating={locate.active}
         onLocate={locate.toggle}
-        filterActive={Boolean(filterType)}
+        filterActive={hasFilters(filters)}
         onOpenSettings={() => setSheet({ kind: "settings" })}
       />
+
+      {(!auteur || editingAuteur) && (
+        <IdentitySheet
+          current={auteur}
+          onSave={(name) => {
+            setAuteur(name);
+            setEditingAuteur(false);
+          }}
+          onCancel={auteur ? () => setEditingAuteur(false) : null}
+        />
+      )}
     </div>
   );
 }

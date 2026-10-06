@@ -10,8 +10,15 @@ localisation, légende et filtres. Recherche d'adresse en haut.
 
 - **Mode Prospecter** : un tap enregistre un passage aujourd'hui avec le type en cours
   (sans toucher aux BAL, code d'entrée et infos). Une notification permet d'**annuler**.
-- **Mode Éditer** : un tap ouvre la fiche du bâtiment (adresse, date, type, BAL, code,
-  infos, suppression). Le clic droit / appui long ouvre aussi la fiche dans les deux modes.
+- **Mode Éditer** : un tap ouvre la fiche du bâtiment : accès (libre, code, badge,
+  interphone, inaccessible), code d'entrée, BAL, logement social, infos, et l'historique
+  des passages (ajout d'un passage daté, suppression). Le clic droit / appui long ouvre
+  aussi la fiche dans les deux modes.
+- **Prénom** : demandé à la première ouverture et enregistré avec chaque passage
+  (ce n'est pas une connexion sécurisée).
+- **Légende et filtres** : filtres par type, collègue, ancienneté, code connu,
+  inaccessibles, logements sociaux ; export CSV (fiches et historique) pour Excel.
+- **Temps réel** : les passages des collègues apparaissent sans recharger la page.
 - **Couleurs** : du bleu le plus foncé (passage de moins de 7 jours) au plus clair
   (plus de 90 jours) ; gris discret = jamais prospecté. Légende dans « Légende et filtres ».
 
@@ -31,10 +38,11 @@ npm run build                # build de production dans build/
 src/
   App.jsx                  assemblage : carte, modes, fiches, notifications
   components/              BuildingsLayer, BottomBar, BuildingSheet, SettingsSheet,
-                           SearchBar, Toasts, Icon
+                           IdentitySheet, SearchBar, Toasts, Icon
   hooks/                   useProspections, useProspectTypes, useStoredState, useNow,
                            useToasts, useLocate
-  lib/                     logique pure et testée : couleurs, dates, données, adresses
+  lib/                     logique pure et testée : couleurs, dates, données, filtres,
+                           adresses, export CSV
 supabase/migrations/       historique des modifications de la base
 public/
   batiments-15e.geojson    bâtiments OSM du 15e (allégé : identifiant, nom, adresse)
@@ -43,7 +51,14 @@ public/
 
 ## Données
 
-- Tables Supabase : `prospections` (une ligne par bâtiment) et `prospection_types`.
+- Tables Supabase :
+  - `passages` : l'historique, une ligne par passage (date, type, prénom) ;
+  - `prospections` : la fiche de chaque bâtiment (BAL, code, accès, logement social,
+    infos) et le résumé de son dernier passage, **tenu à jour par la base**
+    (déclencheurs de la migration 03) : l'appli n'écrit jamais la date dans cette table ;
+  - `prospection_types` : les types de prospection.
+- Chaque modification de la base est un fichier de `supabase/migrations/`, à exécuter
+  dans l'éditeur SQL de Supabase avant de publier le code qui en dépend.
 - Les bâtiments proviennent d'OpenStreetMap via https://overpass-turbo.eu/.
   Les prospections sont rattachées à l'identifiant OSM (`way/…`, `relation/…`) :
   en cas de régénération du fichier, conserver ces identifiants.

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import { GeoJSON } from "react-leaflet";
 import { colorFor, NEVER_COLOR, styleFor } from "../lib/colors";
-import { featureId } from "../lib/prospections";
+import { featureId, hasFilters, matchesFilters } from "../lib/prospections";
 
 // Style de départ, constant : le changer forcerait Leaflet à restyler
 // toute la couche.
@@ -9,34 +9,38 @@ const BASE_STYLE = styleFor(NEVER_COLOR);
 
 // Couche des bâtiments. Tap = onTap(building), clic droit / appui long =
 // onEdit(building), avec building = { id, latlng, properties }.
-export default function BuildingsLayer({ buildings, records, filterType, now, selectedId, onTap, onEdit }) {
+export default function BuildingsLayer({ buildings, records, filters, now, selectedId, onTap, onEdit }) {
   const groupRef = useRef(null);
-  const layersRef = useRef(new Map()); // id → { layer, color, selected }
+  const layersRef = useRef(new Map()); // id → { layer, key }
 
   // Indexe les couches réellement affichées, une fois montées.
   useEffect(() => {
     const index = new Map();
     groupRef.current.eachLayer((layer) => {
-      index.set(featureId(layer.feature), { layer, color: null, selected: false });
+      index.set(featureId(layer.feature), { layer, key: null });
     });
     layersRef.current = index;
   }, [buildings]);
 
-  // Restyle uniquement les bâtiments qui changent (après un tap, un
-  // changement de filtre, de sélection ou le passage du temps).
+  // Restyle uniquement les bâtiments dont l'apparence change (après un tap,
+  // un changement venu d'un collègue, de filtre, de sélection ou de date).
   useEffect(() => {
+    const filtering = hasFilters(filters);
     for (const [id, entry] of layersRef.current) {
       const record = records.get(id);
-      const shown = record && (!filterType || record.prospection_type_id === filterType);
-      const color = colorFor(shown ? record.date : null, now);
-      const selected = id === selectedId;
-      if (color !== entry.color || selected !== entry.selected) {
-        entry.layer.setStyle(styleFor(color, selected));
-        entry.color = color;
-        entry.selected = selected;
+      const color = colorFor(record?.date, now);
+      const options = {
+        selected: id === selectedId,
+        inaccessible: record?.acces === "inaccessible",
+        hidden: filtering && !matchesFilters(record, filters, now),
+      };
+      const key = `${color}|${options.selected}|${options.inaccessible}|${options.hidden}`;
+      if (key !== entry.key) {
+        entry.layer.setStyle(styleFor(color, options));
+        entry.key = key;
       }
     }
-  }, [buildings, records, filterType, now, selectedId]);
+  }, [buildings, records, filters, now, selectedId]);
 
   const eventHandlers = useMemo(() => {
     const building = (e) => ({

@@ -23,12 +23,19 @@ export function colorFor(date, now = new Date()) {
 }
 
 // Style Leaflet d'un bâtiment. Les bâtiments jamais prospectés restent
-// discrets pour ne pas noyer la carte ; le bâtiment ouvert est cerclé.
-export function styleFor(color, selected = false) {
+// discrets pour ne pas noyer la carte ; le bâtiment ouvert est cerclé ;
+// un bâtiment inaccessible a un contour en pointillés ; un bâtiment écarté
+// par les filtres n'est plus qu'un léger contour.
+export function styleFor(color, { selected = false, inaccessible = false, hidden = false } = {}) {
+  if (hidden && !selected) {
+    return { color: NEVER_COLOR, weight: 0.5, opacity: 0.4, fillOpacity: 0, dashArray: null };
+  }
   const never = color === NEVER_COLOR;
   return {
     color: selected ? "#111111" : color,
-    weight: selected ? 3 : never ? 0.75 : 1,
+    weight: selected ? 3 : inaccessible ? 2 : never ? 0.75 : 1,
+    opacity: 1,
+    dashArray: inaccessible ? "5 4" : null,
     fillColor: color,
     fillOpacity: never ? 0.12 : 0.6,
   };

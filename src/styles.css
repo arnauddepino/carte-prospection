@@ -494,3 +494,148 @@ textarea {
   color: #fff;
   text-decoration: underline;
 }
+
+/* ─── Fiche : sections, accès, historique ──────────────────── */
+.sheet-section {
+  display: grid;
+  gap: 14px;
+}
+.sheet-section + .sheet-section {
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.field-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chip {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink-2);
+  cursor: pointer;
+}
+.chip[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.chip.chip-warning[aria-pressed="true"] {
+  background: var(--warning);
+  border-color: var(--warning);
+}
+.checkboxes {
+  display: grid;
+  gap: 4px;
+}
+.checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.checkbox input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--ink);
+}
+.passage-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.passage-add input,
+.passage-add select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 16px;
+}
+.passages {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.passages li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+}
+.passages li > div {
+  display: grid;
+  gap: 2px;
+  font-size: 15px;
+}
+.passages li span {
+  font-size: 14px;
+  color: var(--muted);
+}
+.button.small {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+.button.text {
+  background: transparent;
+  color: var(--ink-2);
+}
+.button.grow {
+  flex: 1;
+}
+.identity-row {
+  align-items: center;
+  justify-content: space-between;
+  font-size: 16px;
+  font-weight: 600;
+}
+.swatch.dashed {
+  border-style: dashed;
+  border-width: 2px;
+}
+
+/* ─── Fenêtre « Qui prospecte ? » ──────────────────────────── */
+.overlay {
+  position: absolute;
+  z-index: 1300;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.45);
+}
+.dialog {
+  display: grid;
+  gap: 14px;
+  box-sizing: border-box;
+  width: min(100%, 400px);
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.dialog h2 {
+  margin: 0;
+  font-size: 20px;
+}
