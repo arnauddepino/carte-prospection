@@ -18,6 +18,7 @@ export default function BuildingSheet({
   record,
   types,
   selectedType,
+  sectorName,
   pendingPassages = [],
   onSaveFiche,
   onAddPassage,
@@ -76,6 +77,7 @@ export default function BuildingSheet({
       <header className="sheet-header">
         <div>
           <h2>{address ?? "Bâtiment"}</h2>
+          {sectorName && <p className="sheet-sector">{sectorName}</p>}
           <p className="sheet-subtitle">
             {record?.date
               ? [

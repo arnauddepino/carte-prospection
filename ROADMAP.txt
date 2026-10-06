@@ -83,19 +83,31 @@ modifier et supprimer les données, y compris les codes d'entrée.
 
 ÉTAPE 5 — ALLER PLUS LOIN ...................................... EN COURS
 --------------------------------------------------------------------------
-  [x] Mode hors ligne (halls, sous-sols) — PRÊT, À METTRE EN LIGNE :
+  [x] Mode hors ligne (halls, sous-sols) — EN LIGNE (commit fae9e8d) :
       la carte s'ouvre sans réseau (appli, bâtiments, tuiles déjà vues) ;
       taps, fiches et annulations enregistrés sur le téléphone puis envoyés
       au retour du réseau ; pastille « Hors ligne · N en attente » ; aucun
       doublon si une réponse se perd (identifiant de passage, migration 04)
       Tests : 47 tests unitaires, 25 vérifications hors ligne avec vraie
       coupure, 31 vérifications de l'étape 4 sans régression
-  [!] Exécuter la migration 04 dans Supabase (SQL Editor), PUIS mettre en ligne
   [!] Tester sur le terrain : ouvrir la carte une fois avec du réseau, puis
       prospecter dans un hall ou un sous-sol
-  [ ] Secteurs dessinés sur la carte (choix validé), attribution par
-      collègue, progression en %
-  [ ] Préparer une tournée : nombre de BAL donc de flyers à prévoir
+  [x] Secteurs — PRÊT, À METTRE EN LIGNE :
+      dessin en touchant les carrefours, le trait suit les rues (plan OSM
+      des rues du 15e, trottoirs exclus) ; une couleur et un nom par
+      secteur ; ligne côté intérieur par défaut ; toucher une ligne permet
+      de la passer de l'autre côté ou d'« Intervertir » avec le secteur
+      voisin (la rangée d'immeubles longée appartient au secteur) ;
+      responsable ; avancement (% de bâtiments prospectés < 30 jours) et
+      boîtes aux lettres connues ; filtre « Secteur » ; secteur affiché
+      dans la fiche bâtiment ; mis à jour en direct, consultable hors ligne
+      Tests : 56 tests unitaires, 22 vérifications sur de vraies rues
+      (rue des Entrepreneurs), étapes 4 et hors ligne sans régression
+  [!] Exécuter la migration 05 dans Supabase (SQL Editor), puis mettre en ligne
+  [ ] Secteurs : modifier un tracé existant (aujourd'hui : supprimer et
+      redessiner)
+  [~] Préparer une tournée : BAL connues par secteur (fait) ; reste la
+      liste des bâtiments à faire et le nombre de flyers à prévoir
   [ ] Tableau de bord : flyers par semaine, par collègue, par type
   [ ] Retour sur investissement : relier les contacts reçus aux campagnes
   [ ] Couvrir d'autres arrondissements
@@ -116,3 +128,6 @@ JOURNAL
             abonnement temps réel vérifié.
 2026-10-08  Étape 5 — mode hors ligne réalisé (choix : hors ligne seul dans ce
             tour ; secteurs à dessiner plus tard). Migration 04 prête.
+2026-10-09  Mode hors ligne en ligne (commit fae9e8d). Secteurs réalisés
+            (choix : dessin qui suit les rues, ligne = rangée attribuée,
+            « Intervertir » échange les rangées). Migration 05 prête.

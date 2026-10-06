@@ -17,6 +17,7 @@ function Swatch({ color, inaccessible = false }) {
 // Légende, filtres d'affichage, types de prospection, export et prénom.
 export default function SettingsSheet({
   types,
+  secteurs = [],
   auteurs,
   filters,
   onFilters,
@@ -63,6 +64,19 @@ export default function SettingsSheet({
         </ul>
 
         <h3>Filtres</h3>
+        {secteurs.length > 0 && (
+          <div className="field">
+            <label htmlFor="flt-secteur">Secteur</label>
+            <select id="flt-secteur" value={filters.secteurId ?? ""} onChange={(e) => set({ secteurId: toId(e.target.value) })}>
+              <option value="">Tous les secteurs</option>
+              {secteurs.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.nom}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div className="field">
           <label htmlFor="flt-type">Type de prospection</label>
           <select id="flt-type" value={filters.typeId ?? ""} onChange={(e) => set({ typeId: toId(e.target.value) })}>

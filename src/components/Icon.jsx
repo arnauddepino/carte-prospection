@@ -20,6 +20,12 @@ const PATHS = {
     </>
   ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
+  sectors: (
+    <>
+      <path d="M4 7.5 10 4l7 2.5 3 8-6.5 5.5L5 17Z" />
+      <path d="M10 4l1.5 8.5L20 14.5M11.5 12.5 5 17" />
+    </>
+  ),
 };
 
 export default function Icon({ name, size = 22 }) {

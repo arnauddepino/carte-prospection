@@ -9,7 +9,7 @@ const BASE_STYLE = styleFor(NEVER_COLOR);
 
 // Couche des bâtiments. Tap = onTap(building), clic droit / appui long =
 // onEdit(building), avec building = { id, latlng, properties }.
-export default function BuildingsLayer({ buildings, records, filters, now, selectedId, onTap, onEdit }) {
+export default function BuildingsLayer({ buildings, records, sectorOf, filters, now, selectedId, onTap, onEdit }) {
   const groupRef = useRef(null);
   const layersRef = useRef(new Map()); // id → { layer, key }
 
@@ -32,7 +32,7 @@ export default function BuildingsLayer({ buildings, records, filters, now, selec
       const options = {
         selected: id === selectedId,
         inaccessible: record?.acces === "inaccessible",
-        hidden: filtering && !matchesFilters(record, filters, now),
+        hidden: filtering && !matchesFilters(record, filters, now, sectorOf.get(id) ?? null),
       };
       const key = `${color}|${options.selected}|${options.inaccessible}|${options.hidden}`;
       if (key !== entry.key) {
@@ -40,7 +40,7 @@ export default function BuildingsLayer({ buildings, records, filters, now, selec
         entry.key = key;
       }
     }
-  }, [buildings, records, filters, now, selectedId]);
+  }, [buildings, records, sectorOf, filters, now, selectedId]);
 
   const eventHandlers = useMemo(() => {
     const building = (e) => ({

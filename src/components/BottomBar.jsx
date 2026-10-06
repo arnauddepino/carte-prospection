@@ -15,6 +15,7 @@ export default function BottomBar({
   onLocate,
   filterActive,
   onOpenSettings,
+  onOpenSectors,
 }) {
   return (
     <nav className="bottom-bar" aria-label="Outils">
@@ -57,6 +58,9 @@ export default function BottomBar({
           onClick={onLocate}
         >
           <Icon name="locate" />
+        </button>
+        <button className="icon-button" aria-label="Secteurs" onClick={onOpenSectors}>
+          <Icon name="sectors" />
         </button>
         <button
           className={`icon-button${filterActive ? " has-dot" : ""}`}

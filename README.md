@@ -23,6 +23,12 @@ localisation, légende et filtres. Recherche d'adresse en haut.
   Taps et fiches sont enregistrés sur le téléphone puis envoyés automatiquement au
   retour du réseau (pastille « Hors ligne · N modifications en attente » en haut à gauche).
   L'historique d'une fiche, la recherche d'adresse et l'export nécessitent le réseau.
+- **Secteurs** (bouton du milieu de la barre) : « Dessiner un secteur », puis toucher les
+  carrefours dans l'ordre ; le trait suit les rues ; toucher le premier point referme le
+  secteur. La ligne colorée longe la rangée d'immeubles qui appartient au secteur : pendant
+  que le panneau Secteurs est ouvert, toucher une ligne permet de la passer de l'autre côté
+  de la rue ou de l'« Intervertir » avec le secteur voisin. Chaque secteur indique son
+  avancement (bâtiments prospectés depuis moins de 30 jours) et ses boîtes aux lettres.
 - **Couleurs** : du bleu le plus foncé (passage de moins de 7 jours) au plus clair
   (plus de 90 jours) ; gris discret = jamais prospecté. Légende dans « Légende et filtres ».
 
@@ -42,16 +48,20 @@ npm run build                # build de production dans build/
 src/
   App.jsx                  assemblage : carte, modes, fiches, notifications
   components/              BuildingsLayer, BottomBar, BuildingSheet, SettingsSheet,
-                           IdentitySheet, SearchBar, Toasts, Icon
+                           IdentitySheet, SectorsLayer, SectorSheets, SearchBar,
+                           SyncStatus, Toasts, Icon
   hooks/                   useProspections (fiches, temps réel, file d'envoi hors ligne),
                            useProspectTypes, useStoredState, useNow, useToasts, useLocate
   lib/                     logique pure et testée : couleurs, dates, données, filtres,
-                           file d'envoi (outbox), adresses, export CSV
+                           file d'envoi (outbox), plan des rues et itinéraires (streets),
+                           secteurs et rattachement des bâtiments, adresses, export CSV
 public/sw.js               service worker : appli, bâtiments et tuiles disponibles hors ligne
 supabase/migrations/       historique des modifications de la base
 public/
   batiments-15e.geojson    bâtiments OSM du 15e (allégé : identifiant, nom, adresse)
-  zones-jaune.geojson      zone non utilisée pour l'instant (future notion de secteur)
+  rues-15e.json            plan des rues du 15e (OSM, sans trottoirs ni passages piétons)
+                           pour tracer les secteurs en suivant les rues
+  zones-jaune.geojson      ancienne zone, non utilisée
 ```
 
 ## Données
@@ -61,7 +71,9 @@ public/
   - `prospections` : la fiche de chaque bâtiment (BAL, code, accès, logement social,
     infos) et le résumé de son dernier passage, **tenu à jour par la base**
     (déclencheurs de la migration 03) : l'appli n'écrit jamais la date dans cette table ;
-  - `prospection_types` : les types de prospection.
+  - `prospection_types` : les types de prospection ;
+  - `secteurs` : contour (points posés, tronçons qui suivent les rues), côtés inversés,
+    couleur, responsable.
 - Chaque modification de la base est un fichier de `supabase/migrations/`, à exécuter
   dans l'éditeur SQL de Supabase avant de publier le code qui en dépend.
 - Les bâtiments proviennent d'OpenStreetMap via https://overpass-turbo.eu/.

@@ -79,6 +79,7 @@ export function applyPassage(record, passage) {
 // ─── Filtres d'affichage ──────────────────────────────────────────────────
 
 export const NO_FILTERS = {
+  secteurId: null,
   typeId: null,
   auteur: null,
   age: null, // null | "recent" (< 30 j) | "a-refaire" (≥ 30 j ou jamais)
@@ -88,12 +89,14 @@ export const NO_FILTERS = {
 };
 
 export const hasFilters = (f) =>
-  Boolean(f.typeId || f.auteur || f.age || f.avecCode || f.inaccessible || f.social);
+  Boolean(f.secteurId || f.typeId || f.auteur || f.age || f.avecCode || f.inaccessible || f.social);
 
 const DAYS_30 = 30 * 24 * 3600 * 1000;
 
-// Le bâtiment correspond-il à tous les filtres actifs ?
-export function matchesFilters(record, f, now = new Date()) {
+// Le bâtiment correspond-il à tous les filtres actifs ? (secteurId = secteur
+// du bâtiment, s'il en a un)
+export function matchesFilters(record, f, now = new Date(), secteurId = null) {
+  if (f.secteurId && secteurId !== f.secteurId) return false;
   if (f.typeId && record?.prospection_type_id !== f.typeId) return false;
   if (f.auteur && record?.dernier_auteur !== f.auteur) return false;
   if (f.avecCode && !record?.code_entree) return false;
