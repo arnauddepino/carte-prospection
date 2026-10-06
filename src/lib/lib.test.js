@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { colorFor, NEVER_COLOR } from "./colors";
-import { fromDateInputValue, toDateInputValue } from "./dates";
+import { AGE_STEPS, colorFor, NEVER_COLOR, styleFor } from "./colors";
+import { fromDateInputValue, relativeDay, toDateInputValue } from "./dates";
 import { formToPayload, indexByBuilding, recordToForm } from "./prospections";
 
 const daysAgo = (n, now) => new Date(now.getTime() - n * 24 * 3600 * 1000).toISOString();
@@ -13,10 +13,25 @@ describe("colorFor", () => {
   });
 
   test.each([
-    [0, "green"], [6, "green"], [7, "yellow"], [13, "yellow"],
-    [14, "orange"], [29, "orange"], [30, "red"], [89, "red"], [90, "black"], [400, "black"],
-  ])("%i jours → %s", (days, color) => {
-    expect(colorFor(daysAgo(days, now), now)).toBe(color);
+    [0, 0], [6, 0], [7, 1], [13, 1], [14, 2], [29, 2], [30, 3], [89, 3], [90, 4], [400, 4],
+  ])("%i jours → palier %i", (days, step) => {
+    expect(colorFor(daysAgo(days, now), now)).toBe(AGE_STEPS[step].color);
+  });
+
+  test("bâtiment jamais prospecté discret, bâtiment ouvert cerclé", () => {
+    expect(styleFor(NEVER_COLOR).fillOpacity).toBeLessThan(styleFor(AGE_STEPS[4].color).fillOpacity);
+    expect(styleFor(AGE_STEPS[0].color, true)).toMatchObject({ weight: 3, fillColor: AGE_STEPS[0].color });
+  });
+});
+
+describe("relativeDay", () => {
+  const now = new Date(2026, 9, 6, 9, 0);
+  test.each([
+    [new Date(2026, 9, 6, 8, 0), "aujourd’hui"],
+    [new Date(2026, 9, 5, 23, 30), "hier"],
+    [new Date(2026, 9, 1, 12, 0), "il y a 5 jours"],
+  ])("%s → %s", (date, label) => {
+    expect(relativeDay(date.toISOString(), now)).toBe(label);
   });
 });
 

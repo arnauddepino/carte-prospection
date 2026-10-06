@@ -1,0 +1,93 @@
+CARTE DE PROSPECTION — FEUILLE DE ROUTE
+=======================================
+
+Légende :  [x] fait   [~] en cours   [ ] à faire   [!] action à faire par Arnaud
+
+Contexte : outil utilisé surtout sur téléphone, par plusieurs collègues.
+Mise en ligne : chaque push sur la branche main de GitHub est publié
+automatiquement par Vercel (https://carte-prospection.vercel.app).
+
+
+ÉTAPE 1 — SÉCURITÉ ............................................ REPORTÉE
+--------------------------------------------------------------------------
+Aujourd'hui, toute personne qui connaît l'adresse du site peut lire,
+modifier et supprimer les données, y compris les codes d'entrée.
+
+  [ ] Connexion des utilisateurs (lien de connexion par e-mail, Supabase Auth)
+  [ ] Règles d'accès Supabase (RLS) réservées aux utilisateurs connectés
+  [ ] Nettoyer les règles d'accès en double (signalées par Supabase)
+  [!] Mettre à jour Postgres depuis le tableau de bord Supabase
+      (correctifs de sécurité en attente, coupure de quelques minutes)
+
+
+ÉTAPE 2 — FONDATIONS ........................................... TERMINÉE
+--------------------------------------------------------------------------
+  [x] Passage de Create React App à Vite (compatible avec la config Vercel)
+  [x] Code découpé en composants (components / hooks / lib)
+  [x] Fichier des bâtiments allégé : 15,3 Mo -> 4,2 Mo (mêmes identifiants)
+  [x] Affichage plus fluide sur mobile (mode Canvas, recoloriage ciblé)
+  [x] Bug : un tap effaçait le BAL, le code d'entrée et les infos
+  [x] Bug : les clics utilisaient des données périmées
+  [x] Bug : la fiche changeait le type du bâtiment
+  [x] Bug : erreurs réseau silencieuses (l'utilisateur est maintenant prévenu)
+  [x] Bug : couleurs figées quand l'appli reste ouverte plusieurs jours
+  [x] Bug : décalage de date (colonne passée en timestamptz)
+  [x] Bug : doublons en base (93 lignes fusionnées, contrainte d'unicité)
+  [x] Zoom 19 (numéros de rue), type et filtre mémorisés
+  [x] Tests automatiques (19 tests unitaires + 24 vérifications de bout en bout)
+  [!] Tester l'appui long sur un vrai téléphone (ouverture de la fiche)
+
+
+ÉTAPE 3 — INTERFACE MOBILE .......................... PRÊTE, À METTRE EN LIGNE
+--------------------------------------------------------------------------
+  [x] Barre d'outils en bas de l'écran, à portée de pouce
+  [x] Fiche bâtiment qui monte du bas de l'écran (remplace la petite fenêtre)
+  [x] Mode prospection / mode édition (plus besoin de l'appui long)
+  [x] Légende des couleurs (bouton « Légende et filtres »)
+  [x] Bouton « Annuler » après chaque tap
+  [x] Vibration de confirmation (Android)
+  [x] Notifications discrètes à la place des fenêtres d'alerte
+  [x] Création des types et filtre déplacés dans « Légende et filtres »
+  [x] Nouvelle palette bleue (foncé = récent, clair = ancien), vérifiée pour
+      les daltoniens et sur le fond de carte
+  [x] Icône et nom de l'application (installation sur l'écran d'accueil)
+  [x] Recherche d'adresse via l'API Adresse officielle (IGN / BAN)
+  [x] Adresse du bâtiment affichée en titre de la fiche
+  [x] Tests : 23 tests unitaires + 37 vérifications de bout en bout
+      (dont taps tactiles en taille téléphone)
+  [!] Mettre en ligne (commit + push), puis tester sur le terrain
+  [!] Prévenir les collègues du changement de couleurs et du mode Éditer
+
+
+ÉTAPE 4 — DONNÉES ET COLLABORATION .............................. À FAIRE
+--------------------------------------------------------------------------
+  [ ] Historique des passages (date, type, auteur, nombre de flyers)
+  [ ] Mise à jour en temps réel des taps des collègues
+  [ ] Statut d'accès du bâtiment : accessible / code / badge / inaccessible
+  [ ] Repérer les logements sociaux
+  [~] Adresses des bâtiments (affichées dans la fiche ; reste : recherche
+      et export par adresse)
+  [ ] Filtres : ancienneté, collègue, « avec code », inaccessible
+  [ ] Export CSV / Excel
+
+
+ÉTAPE 5 — ALLER PLUS LOIN ....................................... À FAIRE
+--------------------------------------------------------------------------
+  [ ] Mode hors ligne (halls, sous-sols) avec envoi au retour du réseau
+  [ ] Secteurs : attribution par collègue, progression en %
+  [ ] Préparer une tournée : nombre de BAL donc de flyers à prévoir
+  [ ] Tableau de bord : flyers par semaine, par collègue, par type
+  [ ] Retour sur investissement : relier les contacts reçus aux campagnes
+  [ ] Couvrir d'autres arrondissements
+  [ ] Redécouper un bâtiment fusionné par OpenStreetMap
+
+
+JOURNAL
+--------------------------------------------------------------------------
+2026-10-02  État des lieux de l'outil.
+2026-10-06  Revue de code et feuille de route validée (sécurité reportée).
+2026-10-06  Étape 2 en ligne (commit 53a4d80). Base : dates corrigées,
+            804 -> 711 lignes après fusion des doublons, contrainte d'unicité.
+            Sauvegarde des tables dans sauvegardes/ (non publiée sur GitHub).
+2026-10-06  Étape 3 réalisée (choix : mode Prospecter / Éditer, palette
+            bleue pour daltoniens). En attente de mise en ligne.

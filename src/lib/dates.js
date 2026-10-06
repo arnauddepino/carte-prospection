@@ -14,3 +14,12 @@ export function fromDateInputValue(value) {
   const [y, m, d] = value.split("-").map(Number);
   return new Date(y, m - 1, d, 12).toISOString();
 }
+
+// « aujourd'hui », « hier », « il y a 12 jours » (en jours calendaires).
+export function relativeDay(iso, now = new Date()) {
+  const start = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const days = Math.round((start(now) - start(new Date(iso))) / 86400000);
+  if (days <= 0) return "aujourd’hui";
+  if (days === 1) return "hier";
+  return `il y a ${days} jours`;
+}

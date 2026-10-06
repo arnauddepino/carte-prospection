@@ -5,10 +5,15 @@ React + Leaflet, données dans Supabase, déployé sur Vercel à chaque push.
 
 ## Utilisation
 
-- **Tap sur un bâtiment** : enregistre un passage aujourd'hui avec le type sélectionné
-  (ne modifie pas les BAL, code d'entrée et infos déjà saisis).
-- **Clic droit / appui long** : ouvre la fiche du bâtiment (date, BAL, code, infos, suppression).
-- **Couleurs** : gris = jamais prospecté · vert < 7 j · jaune < 14 j · orange < 30 j · rouge < 90 j · noir ≥ 90 j.
+Barre du bas : mode **Prospecter / Éditer**, type de prospection en cours,
+localisation, légende et filtres. Recherche d'adresse en haut.
+
+- **Mode Prospecter** : un tap enregistre un passage aujourd'hui avec le type en cours
+  (sans toucher aux BAL, code d'entrée et infos). Une notification permet d'**annuler**.
+- **Mode Éditer** : un tap ouvre la fiche du bâtiment (adresse, date, type, BAL, code,
+  infos, suppression). Le clic droit / appui long ouvre aussi la fiche dans les deux modes.
+- **Couleurs** : du bleu le plus foncé (passage de moins de 7 jours) au plus clair
+  (plus de 90 jours) ; gris discret = jamais prospecté. Légende dans « Légende et filtres ».
 
 ## Développement
 
@@ -24,10 +29,13 @@ npm run build                # build de production dans build/
 
 ```
 src/
-  App.jsx                  assemblage : carte, panneau, fiche, gestion des erreurs
-  components/              BuildingsLayer, ControlPanel, EditPopup, MapControls
-  hooks/                   useProspections, useProspectTypes, useStoredState, useNow
-  lib/                     logique pure et testée : couleurs, dates, préparation des données
+  App.jsx                  assemblage : carte, modes, fiches, notifications
+  components/              BuildingsLayer, BottomBar, BuildingSheet, SettingsSheet,
+                           SearchBar, Toasts, Icon
+  hooks/                   useProspections, useProspectTypes, useStoredState, useNow,
+                           useToasts, useLocate
+  lib/                     logique pure et testée : couleurs, dates, données, adresses
+supabase/migrations/       historique des modifications de la base
 public/
   batiments-15e.geojson    bâtiments OSM du 15e (allégé : identifiant, nom, adresse)
   zones-jaune.geojson      zone non utilisée pour l'instant (future notion de secteur)
