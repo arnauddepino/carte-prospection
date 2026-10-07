@@ -93,7 +93,7 @@ modifier et supprimer les données, y compris les codes d'entrée.
   [!] Tester sur le terrain : ouvrir la carte une fois avec du réseau, puis
       prospecter dans un hall ou un sous-sol
   [x] Secteurs (1re version, contours fermés) — en ligne (commit 7234e3e)
-  [x] Secteurs en traits ouverts — PRÊT, À METTRE EN LIGNE :
+  [x] Secteurs en traits ouverts — EN LIGNE (commit e696b70) :
       un secteur = des tronçons de rue, en un ou plusieurs traits qui ne se
       rejoignent pas forcément (« Lever le crayon ») ; le trait suit les
       rues ; chaque tronçon couvre les deux côtés (ligne au milieu de la
@@ -103,11 +103,22 @@ modifier et supprimer les données, y compris les codes d'entrée.
       boîtes aux lettres, filtre, secteur dans la fiche bâtiment
       Tests : 59 tests unitaires, 21 vérifications sur de vraies rues,
       étapes 4 et hors ligne sans régression
-  [!] Exécuter la migration 06 dans Supabase (SQL Editor), puis mettre en
-      ligne aussitôt (l'ancienne version ne sait plus créer de secteur)
+  [x] Migration 06 appliquée ; 5 secteurs dessinés par l'équipe (Nord Est,
+      Nord Ouest, Agence, Sud Ouest, Sud Est), aucune rue en commun
   [~] Préparer une tournée : BAL connues par secteur (fait) ; reste la
       liste des bâtiments à faire et le nombre de flyers à prévoir
-  [ ] Tableau de bord : flyers par semaine, par collègue, par type
+  [x] Tableau de bord — PRÊT, À METTRE EN LIGNE (aucune migration) :
+      bouton « Tableau de bord » dans la barre du bas ; filtres période
+      (4 / 12 semaines, 6 mois) et secteur ; couverture actuelle en grand ;
+      passages et flyers estimés avec écart vs période précédente ;
+      collègues actifs ; passages par semaine ; couverture dans le temps
+      (30 jours glissants) ; par collègue ; par type ; couverture par
+      secteur ; info-bulles et « Voir les chiffres » (tableau) partout
+      Tests : 67 tests unitaires ; vérifié sur les vraies données en lecture
+      seule (aucune écriture) ; un bug d'info-bulle trouvé et corrigé ;
+      garde-fou : une erreur d'affichage n'efface plus toute l'appli
+  [!] Renseigner les boîtes aux lettres (BAL) dans les fiches : sans elles,
+      le nombre de flyers ne peut pas être estimé (0 % aujourd'hui)
   [ ] Retour sur investissement : relier les contacts reçus aux campagnes
   [ ] Couvrir d'autres arrondissements
   [ ] Redécouper un bâtiment fusionné par OpenStreetMap
@@ -132,3 +143,8 @@ JOURNAL
             « Intervertir » échange les rangées). Migration 05 prête.
 2026-10-10  Secteurs revus en traits ouverts (demande : « une succession de
             traits qui parfois ne rejoignent rien »). Migration 06 prête.
+2026-10-07  Secteurs en traits ouverts en ligne (commit e696b70), migration 06
+            appliquée. 5 secteurs, 62 tronçons, 598 segments de rue couverts.
+2026-10-07  Tableau de bord réalisé. Constat sur les vraies données : 2
+            passages sur les 12 dernières semaines (120 sur 6 mois), aucune
+            BAL renseignée, passages récents sans prénom.

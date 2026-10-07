@@ -16,6 +16,7 @@ export default function BottomBar({
   filterActive,
   onOpenSettings,
   onOpenSectors,
+  onOpenDashboard,
 }) {
   return (
     <nav className="bottom-bar" aria-label="Outils">
@@ -58,6 +59,9 @@ export default function BottomBar({
           onClick={onLocate}
         >
           <Icon name="locate" />
+        </button>
+        <button className="icon-button" aria-label="Tableau de bord" onClick={onOpenDashboard}>
+          <Icon name="chart" />
         </button>
         <button className="icon-button" aria-label="Secteurs" onClick={onOpenSectors}>
           <Icon name="sectors" />

@@ -26,6 +26,8 @@ import { featureId, formToPayload, hasFilters, NO_FILTERS, passagePayload } from
 import BuildingsLayer from "./components/BuildingsLayer";
 import BottomBar from "./components/BottomBar";
 import BuildingSheet from "./components/BuildingSheet";
+import Dashboard from "./components/Dashboard";
+import ErrorBoundary from "./components/ErrorBoundary";
 import IdentitySheet from "./components/IdentitySheet";
 import SearchBar from "./components/SearchBar";
 import SectorsLayer from "./components/SectorsLayer";
@@ -110,6 +112,7 @@ function ProspectionMap() {
   // null | { kind: "building", building } | { kind: "settings" } | { kind: "sectors" }
   // | { kind: "sector", sector } | { kind: "leg", sectorId, i, neighbors, streetName }
   const [sheet, setSheet] = useState(null);
+  const [dashboardOpen, setDashboardOpen] = useState(false);
   const { secteurs, save: saveSecteur, remove: removeSecteur } = useSecteurs();
   const [sectorsVisible, setSectorsVisible] = useStoredState("prospection.secteurs.visibles", true);
   const [graph, setGraph] = useState(null);
@@ -165,7 +168,11 @@ function ProspectionMap() {
 
   // Échap ferme la fiche ouverte.
   useEffect(() => {
-    const onKey = (e) => e.key === "Escape" && setSheet(null);
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      setSheet(null);
+      setDashboardOpen(false);
+    };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
   }, []);
@@ -585,7 +592,24 @@ function ProspectionMap() {
         filterActive={hasFilters(filters)}
         onOpenSettings={() => setSheet({ kind: "settings" })}
         onOpenSectors={() => setSheet({ kind: "sectors" })}
+        onOpenDashboard={() => {
+          setSheet(null);
+          setDashboardOpen(true);
+        }}
       />
+      )}
+
+      {dashboardOpen && (
+        <ErrorBoundary onClose={() => setDashboardOpen(false)}>
+          <Dashboard
+            records={records}
+            types={types}
+            secteurs={secteurs}
+            sectorOf={sectorOf}
+            now={now}
+            onClose={() => setDashboardOpen(false)}
+          />
+        </ErrorBoundary>
       )}
 
       {(!auteur || editingAuteur) && (

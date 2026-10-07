@@ -31,6 +31,11 @@ localisation, légende et filtres. Recherche d'adresse en haut.
   avec un secteur voisin puis d'intervertir, ou de supprimer le tronçon ; « Compléter le
   tracé » ajoute des traits à un secteur. Chaque secteur indique son avancement (bâtiments
   prospectés depuis moins de 30 jours) et ses boîtes aux lettres.
+- **Tableau de bord** (bouton de la barre du bas) : couverture actuelle, passages et flyers
+  estimés (d'après les boîtes aux lettres renseignées) avec l'écart par rapport à la
+  période précédente, collègues actifs, passages par semaine, couverture dans le temps,
+  répartition par collègue, par type et par secteur. Filtres : période et secteur.
+  Chaque graphique a une vue « Voir les chiffres ». Nécessite le réseau.
 
 ## Développement
 
@@ -49,12 +54,13 @@ src/
   App.jsx                  assemblage : carte, modes, fiches, notifications
   components/              BuildingsLayer, BottomBar, BuildingSheet, SettingsSheet,
                            IdentitySheet, SectorsLayer, SectorSheets, SearchBar,
-                           SyncStatus, Toasts, Icon
+                           SyncStatus, Toasts, Icon, Dashboard, Charts, ErrorBoundary
   hooks/                   useProspections (fiches, temps réel, file d'envoi hors ligne),
                            useProspectTypes, useStoredState, useNow, useToasts, useLocate
   lib/                     logique pure et testée : couleurs, dates, données, filtres,
                            file d'envoi (outbox), plan des rues et itinéraires (streets),
-                           secteurs et rattachement des bâtiments, adresses, export CSV
+                           secteurs et rattachement des bâtiments, statistiques du
+                           tableau de bord (stats), adresses, export CSV
 public/sw.js               service worker : appli, bâtiments et tuiles disponibles hors ligne
 supabase/migrations/       historique des modifications de la base
 public/

@@ -20,6 +20,7 @@ const PATHS = {
     </>
   ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
+  chart: <path d="M4 20V10M10 20V4M16 20v-8M22 20H2" />,
   sectors: (
     <>
       <path d="M4 7.5 10 4l7 2.5 3 8-6.5 5.5L5 17Z" />
