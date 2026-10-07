@@ -3,6 +3,7 @@ import { fetchPassages } from "../hooks/useProspections";
 import { reverseAddress } from "../lib/adresse";
 import { relativeDay, toDateInputValue } from "../lib/dates";
 import { ACCES, recordToForm } from "../lib/prospections";
+import { balInfo } from "../lib/bal";
 import Icon from "./Icon";
 
 const osmLabel = (p = {}) =>
@@ -19,6 +20,7 @@ export default function BuildingSheet({
   types,
   selectedType,
   sectorName,
+  balData,
   pendingPassages = [],
   onSaveFiche,
   onAddPassage,
@@ -38,6 +40,7 @@ export default function BuildingSheet({
   const [confirm, setConfirm] = useState(null); // id du passage ou "fiche" à confirmer
 
   const typeName = (id) => types.find((t) => t.id === id)?.name;
+  const reference = balInfo(building.id, null, balData); // registre ou estimation, hors saisie
 
   // Adresse la plus proche de l'endroit touché.
   useEffect(() => {
@@ -128,9 +131,25 @@ export default function BuildingSheet({
             </div>
             <div className="field">
               <label htmlFor="f-bal">Boîtes aux lettres</label>
-              <input id="f-bal" type="number" min="0" inputMode="numeric" {...field("bal")} />
+              <input
+                id="f-bal"
+                type="number"
+                min="0"
+                inputMode="numeric"
+                placeholder={reference.value != null ? `${reference.source === "estimation" ? "≈ " : ""}${reference.value}` : ""}
+                {...field("bal")}
+              />
             </div>
           </div>
+          <p className={`bal-source ${form.bal !== "" && form.bal != null ? "saisie" : reference.source ?? "none"}`}>
+            {form.bal !== "" && form.bal != null
+              ? `Saisie dans l’appli${reference.source ? ` (${reference.source === "registre" ? "registre" : "estimation"} : ${reference.source === "estimation" ? "≈ " : ""}${reference.value})` : ""}.`
+              : reference.source === "registre"
+                ? `Registre des copropriétés : ${reference.value} logements${reference.nom ? ` (${reference.nom})` : ""}. Saisissez un nombre pour le corriger.`
+                : reference.source === "estimation"
+                  ? `≈ ${reference.value} estimé d’après la surface et les étages : à vérifier sur place.`
+                  : "Nombre inconnu : à compter sur place."}
+          </p>
 
           <label className="checkbox">
             <input

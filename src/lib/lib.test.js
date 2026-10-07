@@ -152,7 +152,7 @@ describe("export CSV", () => {
     expect(csv.startsWith("\uFEFF")).toBe(true);
     const [header, line] = csv.slice(1).split("\r\n");
     expect(header.split(";")[0]).toBe("Bâtiment");
-    expect(line).toContain(";Flyer A;Léa;12;Code;A1;oui;");
+    expect(line).toContain(";Flyer A;Léa;12;Saisie dans l’appli;Code;A1;oui;");
     expect(line).toContain('"dit ""bonjour""; sympa"');
     expect(line.endsWith(";48.845123;2.291235")).toBe(true);
   });

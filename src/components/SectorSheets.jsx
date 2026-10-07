@@ -17,7 +17,7 @@ function SheetHeader({ title, subtitle, onClose }) {
 }
 
 // Liste des secteurs avec leur avancement.
-export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw, onEdit, onClose }) {
+export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw, onEdit, onTour, onClose }) {
   return (
     <section className="sheet compact" aria-label="Secteurs">
       <SheetHeader
@@ -63,9 +63,16 @@ export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw
           <input type="checkbox" checked={visible} onChange={(e) => onToggleVisible(e.target.checked)} />
           Afficher les secteurs sur la carte
         </label>
-        <button type="button" className="button primary" onClick={onDraw}>
-          Dessiner un secteur
-        </button>
+        <div className="field-inline">
+          <button type="button" className="button secondary grow" onClick={onDraw}>
+            Dessiner un secteur
+          </button>
+          {secteurs.length > 0 && (
+            <button type="button" className="button primary grow" onClick={onTour}>
+              Préparer une tournée
+            </button>
+          )}
+        </div>
       </div>
     </section>
   );

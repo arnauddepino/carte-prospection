@@ -1,3 +1,4 @@
+import { BAL_SOURCES } from "./bal";
 import { accesLabel } from "./prospections";
 
 // CSV pour Excel en français : séparateur « ; », BOM UTF-8 pour les accents.
@@ -13,7 +14,8 @@ function toCsv(columns, rows) {
 
 const dateFr = (iso) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : "");
 
-export function fichesCsv(records, types, centers = new Map()) {
+// infoOf(id) → { value, source } : boîtes aux lettres retenues et provenance.
+export function fichesCsv(records, types, centers = new Map(), infoOf = (id) => ({ value: records.get(id)?.bal ?? null, source: records.get(id)?.bal != null ? "saisie" : null })) {
   const typeName = (id) => types.find((t) => t.id === id)?.name ?? "";
   const rows = [...records.values()].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return toCsv(
@@ -22,7 +24,8 @@ export function fichesCsv(records, types, centers = new Map()) {
       { label: "Dernier passage", value: (r) => dateFr(r.date) },
       { label: "Type", value: (r) => typeName(r.prospection_type_id) },
       { label: "Par", value: (r) => r.dernier_auteur },
-      { label: "Boîtes aux lettres", value: (r) => r.bal },
+      { label: "Boîtes aux lettres", value: (r) => infoOf(r.id_batiment).value },
+      { label: "Source BAL", value: (r) => BAL_SOURCES[infoOf(r.id_batiment).source]?.long ?? "" },
       { label: "Accès", value: (r) => accesLabel(r.acces) },
       { label: "Code d'entrée", value: (r) => r.code_entree },
       { label: "Logement social", value: (r) => (r.logement_social ? "oui" : "") },

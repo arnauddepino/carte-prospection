@@ -36,6 +36,13 @@ localisation, légende et filtres. Recherche d'adresse en haut.
   période précédente, collègues actifs, passages par semaine, couverture dans le temps,
   répartition par collègue, par type et par secteur. Filtres : période et secteur.
   Chaque graphique a une vue « Voir les chiffres ». Nécessite le réseau.
+- **Boîtes aux lettres (BAL)** : saisie dans la fiche (prioritaire), sinon nombre de lots
+  d'habitation du **registre des copropriétés**, sinon **estimation** (surface au sol × étages,
+  à vérifier). La provenance est toujours affichée : « Saisie », « Registre », « ≈ Estimation ».
+- **Tournée** (panneau Secteurs → « Préparer une tournée ») : bâtiments du secteur sans passage
+  depuis N jours, flyers à prévoir par provenance, **ordre de passage le plus court à pied**,
+  itinéraire sur la carte, barre de suivi avec « Suivant », liste (adresses, codes, BAL),
+  fiche imprimable et bilan. La tournée est gardée sur le téléphone et fonctionne hors ligne.
 
 ## Développement
 
@@ -61,10 +68,13 @@ src/
                            file d'envoi (outbox), plan des rues et itinéraires (streets),
                            secteurs et rattachement des bâtiments, statistiques du
                            tableau de bord (stats), adresses, export CSV
+scripts/donnees-bal.py     met à jour public/bal-15e.json depuis le registre (data.gouv.fr)
 public/sw.js               service worker : appli, bâtiments et tuiles disponibles hors ligne
 supabase/migrations/       historique des modifications de la base
 public/
-  batiments-15e.geojson    bâtiments OSM du 15e (allégé : identifiant, nom, adresse)
+  batiments-15e.geojson    bâtiments OSM du 15e (allégé : identifiant, nom, adresse, type, étages)
+  bal-15e.json             boîtes aux lettres : registre des copropriétés + estimations
+                           (généré par scripts/donnees-bal.py)
   rues-15e.json            plan des rues du 15e (OSM, sans trottoirs ni passages piétons)
                            pour tracer les secteurs en suivant les rues
   zones-jaune.geojson      ancienne zone, non utilisée

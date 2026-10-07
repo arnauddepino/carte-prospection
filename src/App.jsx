@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CircleMarker, MapContainer, TileLayer, useMapEvents } from "react-leaflet";
+import { CircleMarker, MapContainer, Polyline, TileLayer, useMapEvents } from "react-leaflet";
 
 import { supabase } from "./supabaseClient";
 import { fetchPassages, useProspections } from "./hooks/useProspections";
@@ -10,6 +10,10 @@ import { useToasts } from "./hooks/useToasts";
 import { useLocate } from "./hooks/useLocate";
 import { loadStreets, useSecteurs } from "./hooks/useSecteurs";
 import { useSectorDraft } from "./hooks/useSectorDraft";
+import { useBalData } from "./hooks/useBalData";
+import { balInfo, flyersPlan } from "./lib/bal";
+import { planTour, tourCandidates } from "./lib/tournee";
+import { reverseAddress } from "./lib/adresse";
 import {
   assignBuildings,
   nextSectorColor,
@@ -35,6 +39,7 @@ import { DrawBar, LegSheet, SectorEditSheet, SectorsSheet } from "./components/S
 import SettingsSheet from "./components/SettingsSheet";
 import SyncStatus from "./components/SyncStatus";
 import Toasts from "./components/Toasts";
+import { PrintTour, TourBar, TourListSheet, TourSetupSheet, TourSummary } from "./components/TourSheets";
 
 const BUILDINGS_URL = `${import.meta.env.BASE_URL}batiments-15e.geojson`;
 const NETWORK_HINT = "Vérifiez le réseau et réessayez.";
@@ -121,6 +126,10 @@ function ProspectionMap() {
   const locate = useLocate(map);
   const typeSelectRef = useRef(null);
   const now = useNow();
+  const balData = useBalData();
+  const [tour, setTour] = useStoredState("prospection.tournee", null);
+  const [tourSummary, setTourSummary] = useState(null);
+  const [adresses, setAdresses] = useStoredState("prospection.cache.adresses", {});
 
   // Un type mémorisé peut avoir été supprimé entre-temps.
   const selectedType = types.some((t) => t.id === storedType) ? storedType : null;
@@ -383,9 +392,120 @@ function ProspectionMap() {
     setSheet({ kind: "sectors" });
   };
 
+  // ─── Boîtes aux lettres (saisie > registre > estimation) et tournée ───
+  const infoOf = useCallback((id) => balInfo(id, records.get(id), balData), [records, balData]);
+
+  const tourInfo = useMemo(() => {
+    if (!tour) return null;
+    const since = new Date(tour.createdAt);
+    const isDone = (id) => {
+      const r = records.get(id);
+      return Boolean(r?.date && new Date(r.date) >= since);
+    };
+    const remaining = tour.ids.filter((id) => !isDone(id));
+    return {
+      isDone,
+      done: tour.ids.length - remaining.length,
+      nextId: remaining[0] ?? null,
+      remainingFlyers: remaining.reduce((sum, id) => sum + (infoOf(id).value ?? 0), 0),
+      focus: { ids: new Set(tour.ids), nextId: remaining[0] ?? null },
+    };
+  }, [tour, records, infoOf]);
+
+  // Adresse d'un bâtiment : API Adresse (mise en cache), sinon adresse du registre.
+  const addressOf = useCallback(
+    (id) => {
+      if (adresses[id]) return adresses[id];
+      const reg = balData?.registre?.[id]?.[3];
+      return reg ? reg.charAt(0).toUpperCase() + reg.slice(1) : null;
+    },
+    [adresses, balData]
+  );
+
+  // Recherche des adresses de la tournée en arrière-plan (4 à la fois).
+  useEffect(() => {
+    if (!tour || offline) return;
+    let cancelled = false;
+    const todo = tour.ids.filter((id) => !adresses[id] && centers.has(id));
+    (async () => {
+      for (let i = 0; i < todo.length && !cancelled; i += 4) {
+        const batch = todo.slice(i, i + 4);
+        const found = await Promise.all(
+          batch.map((id) => reverseAddress({ lat: centers.get(id)[0], lng: centers.get(id)[1] }).catch(() => null))
+        );
+        if (cancelled) return;
+        setAdresses((a) => ({ ...a, ...Object.fromEntries(batch.map((id, k) => [id, found[k]]).filter(([, v]) => v)) }));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Relancé seulement pour une nouvelle tournée ou au retour du réseau.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tour?.createdAt, offline, centers]);
+
+  const tourCandidatesFor = useCallback(
+    (p) => tourCandidates({ secteurId: p.secteurId, sectorOf, records, now, days: p.days, includeInaccessible: p.includeInaccessible }),
+    [sectorOf, records, now]
+  );
+  const planOf = useCallback((ids) => flyersPlan(ids, infoOf), [infoOf]);
+
+  const myPosition = () =>
+    new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve([p.coords.latitude, p.coords.longitude]),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 }
+      );
+    });
+
+  const startTour = async (params, ids) => {
+    const g = graph ?? (await loadStreets().catch(() => null));
+    if (!g) {
+      show({ kind: "error", text: `Plan des rues indisponible. ${NETWORK_HINT}` });
+      return;
+    }
+    const start = params.fromMyPosition ? await myPosition() : null;
+    const plan = planTour(g, ids.map((id) => ({ id, center: centers.get(id) })), start);
+    setTour({
+      ...params,
+      secteurNom: secteurs.find((s) => s.id === params.secteurId)?.nom ?? "",
+      createdAt: new Date().toISOString(),
+      ids: plan.ids,
+      distance: plan.distance,
+      route: plan.route,
+      plan: flyersPlan(plan.ids, infoOf),
+    });
+    setSelectedType(params.typeId);
+    setMode("prospect");
+    setSheet(null);
+    if (plan.route.length > 1) map?.fitBounds(plan.route, { paddingTopLeft: [24, 140], paddingBottomRight: [24, 170] });
+    const kmText = (plan.distance / 1000).toLocaleString("fr-FR", { maximumFractionDigits: 1 });
+    show({
+      kind: "success",
+      text: `Tournée prête : ${plan.ids.length} bâtiments, ${kmText} km à pied${
+        params.fromMyPosition && !start ? " (position indisponible : meilleur point de départ)" : ""
+      }.`,
+    });
+  };
+
+  const focusBuilding = (id) => {
+    setSheet(null);
+    const c = centers.get(id);
+    if (c) map?.flyTo(c, 19);
+  };
+
+  const finishTour = () => {
+    const done = tour.ids.filter(tourInfo.isDone);
+    setTourSummary({ done: done.length, total: tour.ids.length, flyers: done.reduce((s, id) => s + (infoOf(id).value ?? 0), 0) });
+    setTour(null);
+    setSheet(null);
+  };
+
   const handleExport = async (what) => {
     if (what === "fiches") {
-      downloadText(`prospection-fiches-${today()}.csv`, fichesCsv(records, types, centers));
+      downloadText(`prospection-fiches-${today()}.csv`, fichesCsv(records, types, centers, infoOf));
       return;
     }
     const { data, error } = await fetchPassages();
@@ -405,7 +525,7 @@ function ProspectionMap() {
   const selectedId = sheet?.kind === "building" ? sheet.building.id : null;
 
   return (
-    <div className={`app mode-${mode}${sheet ? " has-sheet" : ""}${draft.active ? " is-drawing" : ""}`}>
+    <div className={`app mode-${mode}${sheet ? " has-sheet" : ""}${draft.active ? " is-drawing" : ""}${tour ? " has-tour" : ""}`}>
       <MapContainer
         ref={setMap}
         center={[48.845, 2.29]}
@@ -430,13 +550,15 @@ function ProspectionMap() {
             records={records}
             sectorOf={sectorOf}
             filters={filters}
+            focus={tourInfo?.focus}
             now={now}
             selectedId={selectedId}
             onTap={handleTap}
             onEdit={openBuilding}
           />
         )}
-        {(sectorsVisible || draft.active || SECTOR_SHEETS.includes(sheet?.kind)) && (
+        {/* Pendant une tournée, l'itinéraire passe devant : lignes de secteur masquées. */}
+        {((sectorsVisible && !tour) || draft.active || SECTOR_SHEETS.includes(sheet?.kind)) && (
           <SectorsLayer
             secteurs={secteurs}
             interactive={SECTOR_SHEETS.includes(sheet?.kind)}
@@ -445,6 +567,13 @@ function ProspectionMap() {
           />
         )}
         {draft.active && <MapClicks onClick={handleDrawClick} />}
+        {tour?.route?.length > 1 && (
+          <Polyline
+            positions={tour.route}
+            interactive={false}
+            pathOptions={{ color: "#111111", weight: 3, opacity: 0.55, dashArray: "1 8", lineCap: "round" }}
+          />
+        )}
         {searchPoint && (
           <CircleMarker
             center={searchPoint}
@@ -491,6 +620,7 @@ function ProspectionMap() {
           types={types}
           selectedType={selectedType}
           sectorName={secteurs.find((s) => s.id === sectorOf.get(sheet.building.id))?.nom}
+          balData={balData}
           pendingPassages={pending
             .filter((op) => op.type === "passage" && op.payload.id_batiment === sheet.building.id)
             .map((op) => op.payload)}
@@ -523,6 +653,7 @@ function ProspectionMap() {
           visible={sectorsVisible}
           onToggleVisible={setSectorsVisible}
           onDraw={() => startDrawing()}
+          onTour={() => setSheet({ kind: "tour-setup" })}
           onEdit={(sector) => setSheet({ kind: "sector", sector })}
           onClose={() => setSheet(null)}
         />
@@ -599,6 +730,53 @@ function ProspectionMap() {
       />
       )}
 
+      {tour && tourInfo && !draft.active && (
+        <TourBar
+          tour={tour}
+          done={tourInfo.done}
+          remainingFlyers={tourInfo.remainingFlyers}
+          nextLabel={tourInfo.nextId ? addressOf(tourInfo.nextId) ?? `n° ${tour.ids.indexOf(tourInfo.nextId) + 1}` : ""}
+          onNext={() => tourInfo.nextId && focusBuilding(tourInfo.nextId)}
+          onList={() => setSheet({ kind: "tour-list" })}
+        />
+      )}
+      {sheet?.kind === "tour-setup" && (
+        <TourSetupSheet
+          secteurs={secteurs}
+          defaultSecteurId={(secteurs.find((s) => s.responsable && s.responsable === auteur) ?? secteurs[0])?.id ?? null}
+          types={types}
+          defaultTypeId={selectedType}
+          candidates={tourCandidatesFor}
+          planOf={planOf}
+          onStart={startTour}
+          onClose={() => setSheet({ kind: "sectors" })}
+        />
+      )}
+      {sheet?.kind === "tour-list" && tour && (
+        <TourListSheet
+          tour={tour}
+          records={records}
+          infoOf={infoOf}
+          isDone={tourInfo.isDone}
+          addressOf={addressOf}
+          typeName={types.find((t) => t.id === tour.typeId)?.name ?? ""}
+          onFocus={focusBuilding}
+          onPrint={() => window.print()}
+          onFinish={finishTour}
+          onClose={() => setSheet(null)}
+        />
+      )}
+      {tourSummary && <TourSummary summary={tourSummary} onClose={() => setTourSummary(null)} />}
+      {tour && (
+        <PrintTour
+          tour={tour}
+          records={records}
+          infoOf={infoOf}
+          addressOf={addressOf}
+          typeName={types.find((t) => t.id === tour.typeId)?.name ?? ""}
+        />
+      )}
+
       {dashboardOpen && (
         <ErrorBoundary onClose={() => setDashboardOpen(false)}>
           <Dashboard
@@ -606,6 +784,7 @@ function ProspectionMap() {
             types={types}
             secteurs={secteurs}
             sectorOf={sectorOf}
+            balData={balData}
             now={now}
             onClose={() => setDashboardOpen(false)}
           />

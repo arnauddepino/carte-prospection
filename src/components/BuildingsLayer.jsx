@@ -9,7 +9,9 @@ const BASE_STYLE = styleFor(NEVER_COLOR);
 
 // Couche des bâtiments. Tap = onTap(building), clic droit / appui long =
 // onEdit(building), avec building = { id, latlng, properties }.
-export default function BuildingsLayer({ buildings, records, sectorOf, filters, now, selectedId, onTap, onEdit }) {
+// focus (tournée en cours) : { ids: Set, nextId } — les autres bâtiments sont
+// estompés et le prochain à faire est cerclé.
+export default function BuildingsLayer({ buildings, records, sectorOf, filters, focus, now, selectedId, onTap, onEdit }) {
   const groupRef = useRef(null);
   const layersRef = useRef(new Map()); // id → { layer, key }
 
@@ -30,9 +32,11 @@ export default function BuildingsLayer({ buildings, records, sectorOf, filters, 
       const record = records.get(id);
       const color = colorFor(record?.date, now);
       const options = {
-        selected: id === selectedId,
+        selected: id === selectedId || id === focus?.nextId,
         inaccessible: record?.acces === "inaccessible",
-        hidden: filtering && !matchesFilters(record, filters, now, sectorOf.get(id) ?? null),
+        hidden:
+          (focus && !focus.ids.has(id)) ||
+          (filtering && !matchesFilters(record, filters, now, sectorOf.get(id) ?? null)),
       };
       const key = `${color}|${options.selected}|${options.inaccessible}|${options.hidden}`;
       if (key !== entry.key) {
@@ -40,7 +44,7 @@ export default function BuildingsLayer({ buildings, records, sectorOf, filters, 
         entry.key = key;
       }
     }
-  }, [buildings, records, sectorOf, filters, now, selectedId]);
+  }, [buildings, records, sectorOf, filters, focus, now, selectedId]);
 
   const eventHandlers = useMemo(() => {
     const building = (e) => ({

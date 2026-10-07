@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { fetchPassages } from "../hooks/useProspections";
 import { useStoredState } from "../hooks/useStoredState";
 import { sectorStats } from "../lib/secteurs";
+import { balInfo } from "../lib/bal";
 import { coverageSeries, deltaPct, foldOthers, groupBy, perWeek, selectPassages, weekStarts } from "../lib/stats";
 import { BarList, ChartCard, ColumnChart, LineChart, StatTile } from "./Charts";
 import Icon from "./Icon";
@@ -15,7 +16,7 @@ const fmt = (n) => Math.round(n).toLocaleString("fr-FR");
 const shortDate = (d) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
 // Tableau de bord : activité de l'équipe et couverture des secteurs.
-export default function Dashboard({ records, types, secteurs, sectorOf, now, onClose }) {
+export default function Dashboard({ records, types, secteurs, sectorOf, balData, now, onClose }) {
   const [weeks, setWeeks] = useStoredState("prospection.tableau.semaines", 12);
   const [secteurId, setSecteurId] = useState(null);
   const [state, setState] = useState({ loading: true, error: null, passages: [] });
@@ -37,7 +38,8 @@ export default function Dashboard({ records, types, secteurs, sectorOf, now, onC
     const opts = { secteurId, sectorOf };
     const current = selectPassages(passages, { from, to, ...opts });
     const previous = selectPassages(passages, { from: prevFrom, to: from, ...opts });
-    const balOf = (id) => records.get(id)?.bal ?? null;
+    const infoOf = (id) => balInfo(id, records.get(id), balData);
+    const balOf = (id) => infoOf(id).value;
     const typeName = (id) => types.find((t) => t.id === id)?.name ?? "Sans type";
 
     // Bâtiments dont on mesure la couverture.
@@ -51,10 +53,19 @@ export default function Dashboard({ records, types, secteurs, sectorOf, now, onC
     const weekEnds = starts.map((s) => new Date(Math.min(+s + 7 * 864e5 - 1, +now)));
     const coverage = coverageSeries(passages, universe, weekEnds);
 
-    const sum = (list) => list.reduce((acc, p) => {
-      const bal = balOf(p.id_batiment);
-      return bal == null ? acc : { flyers: acc.flyers + Number(bal), known: acc.known + 1 };
-    }, { flyers: 0, known: 0 });
+    const sum = (list) =>
+      list.reduce(
+        (acc, p) => {
+          const info = infoOf(p.id_batiment);
+          if (info.value == null) return acc;
+          return {
+            flyers: acc.flyers + info.value,
+            known: acc.known + 1,
+            estimated: acc.estimated + (info.source === "estimation" ? info.value : 0),
+          };
+        },
+        { flyers: 0, known: 0, estimated: 0 }
+      );
     const cur = sum(current);
     const prev = sum(previous);
     const auteurs = new Set(current.map((p) => p.auteur).filter(Boolean));
@@ -66,6 +77,7 @@ export default function Dashboard({ records, types, secteurs, sectorOf, now, onC
       flyers: cur.flyers,
       flyersDelta: deltaPct(cur.flyers, prev.flyers),
       knownShare: current.length ? Math.round((100 * cur.known) / current.length) : 0,
+      estimated: cur.estimated,
       auteurs: auteurs.size,
       coverage,
       universeSize: universe.size,
@@ -135,7 +147,7 @@ export default function Dashboard({ records, types, secteurs, sectorOf, now, onC
               value={fmt(view.flyers)}
               delta={view.flyersDelta}
               deltaLabel={vsPrevious}
-              note={`Boîtes aux lettres connues pour ${view.knownShare} % des passages`}
+              note={`${view.estimated ? `dont ≈ ${fmt(view.estimated)} estimés · ` : ""}boîtes aux lettres connues ou estimées pour ${view.knownShare} % des passages`}
             />
             <StatTile label="Collègues actifs" value={fmt(view.auteurs)} note={periodLabel} />
           </div>

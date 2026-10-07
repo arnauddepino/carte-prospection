@@ -1065,3 +1065,242 @@ textarea {
   border-radius: 0 4px 4px 0;
   background: var(--surface-2);
 }
+
+/* ─── Boîtes aux lettres : provenance lisible sans la couleur ── */
+.bal-badge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 2px;
+  flex: none;
+  padding: 2px 8px;
+  border: 1.5px solid var(--ink-2);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.bal-badge strong {
+  font-size: 13px;
+  color: var(--ink);
+}
+.bal-badge.saisie {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: #fff;
+}
+.bal-badge.saisie strong {
+  color: #fff;
+}
+.bal-badge.estimation {
+  border-style: dashed;
+  font-style: italic;
+}
+.bal-badge.none {
+  border-color: var(--line);
+  color: var(--muted);
+}
+.bal-source {
+  margin: -6px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.bal-source.estimation,
+.bal-source.none {
+  color: var(--warning);
+}
+
+/* ─── Tournée ──────────────────────────────────────────────── */
+.segmented.four {
+  grid-template-columns: repeat(4, 1fr);
+}
+.tour-summary {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.tour-summary p {
+  margin: 0;
+}
+.flyers-plan {
+  display: grid;
+  gap: 6px;
+}
+.flyers-total {
+  margin: 0;
+  font-size: 16px;
+}
+.flyers-plan ul {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+.flyers-plan li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tour-bar {
+  position: absolute;
+  z-index: 1000;
+  top: calc(68px + var(--safe-top));
+  left: 12px;
+  right: 12px;
+  max-width: 560px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-sizing: border-box;
+  padding: 8px 8px 8px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+.tour-bar-text {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.tour-bar-text strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+.tour-bar-text span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tour-bar .button.small {
+  height: 40px;
+}
+/* Avec une tournée, les autres pastilles passent sous la barre de suivi. */
+.has-tour .sync-pill,
+.has-tour .status-banner {
+  top: calc(130px + var(--safe-top));
+}
+.has-tour.has-sheet .toasts {
+  top: calc(130px + var(--safe-top));
+}
+.tour-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tour-list li + li {
+  border-top: 1px solid var(--line);
+}
+.tour-list button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+.tour-index {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--surface-2);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.tour-list li.done .tour-index {
+  background: var(--ink);
+  color: #fff;
+}
+.tour-list li.done .tour-main strong {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.tour-main {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tour-main strong {
+  font-size: 15px;
+  color: var(--ink);
+}
+.tour-bilan {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 16px;
+}
+
+/* ─── Fiche de tournée imprimable ──────────────────────────── */
+.print-sheet {
+  display: none;
+}
+@media print {
+  @page {
+    margin: 12mm;
+  }
+  html,
+  body,
+  #root,
+  .app {
+    position: static;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+  }
+  .app > :not(.print-sheet) {
+    display: none !important;
+  }
+  .print-sheet {
+    display: block;
+    font-size: 11pt;
+    color: #000;
+  }
+  .print-sheet h1 {
+    margin: 0 0 4pt;
+    font-size: 16pt;
+  }
+  .print-sheet p {
+    margin: 0 0 10pt;
+  }
+  .print-sheet table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  .print-sheet th,
+  .print-sheet td {
+    padding: 4pt 6pt;
+    border-bottom: 0.5pt solid #999;
+    text-align: left;
+    vertical-align: top;
+  }
+  .print-sheet tr {
+    break-inside: avoid;
+  }
+  .print-sheet .check-box::before {
+    content: "";
+    display: inline-block;
+    width: 10pt;
+    height: 10pt;
+    border: 1pt solid #000;
+  }
+}

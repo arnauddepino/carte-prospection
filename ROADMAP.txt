@@ -105,9 +105,17 @@ modifier et supprimer les données, y compris les codes d'entrée.
       étapes 4 et hors ligne sans régression
   [x] Migration 06 appliquée ; 5 secteurs dessinés par l'équipe (Nord Est,
       Nord Ouest, Agence, Sud Ouest, Sud Est), aucune rue en commun
-  [~] Préparer une tournée : BAL connues par secteur (fait) ; reste la
-      liste des bâtiments à faire et le nombre de flyers à prévoir
-  [x] Tableau de bord — PRÊT, À METTRE EN LIGNE (aucune migration) :
+  [x] Préparer une tournée — PRÊT, À METTRE EN LIGNE (aucune migration) :
+      secteur, flyer, délai (15/30/60/90 j), inaccessibles ; flyers à
+      prévoir par provenance + 10 % de marge ; ordre de passage le plus
+      court à pied dans les rues (plus proche voisin + 2-opt), depuis ma
+      position ou le meilleur départ ; itinéraire sur la carte ; barre de
+      suivi (« Suivant ») ; liste avec adresses, accès, codes, BAL ; fiche
+      imprimable ; bilan ; fonctionne hors ligne (tournée gardée sur le
+      téléphone)
+      Tests : 77 tests unitaires ; 23 vérifications sur une copie du secteur
+      Agence ; secteurs, étape 4 et hors ligne sans régression
+  [x] Tableau de bord — EN LIGNE (commit ebb089e) :
       bouton « Tableau de bord » dans la barre du bas ; filtres période
       (4 / 12 semaines, 6 mois) et secteur ; couverture actuelle en grand ;
       passages et flyers estimés avec écart vs période précédente ;
@@ -117,8 +125,10 @@ modifier et supprimer les données, y compris les codes d'entrée.
       Tests : 67 tests unitaires ; vérifié sur les vraies données en lecture
       seule (aucune écriture) ; un bug d'info-bulle trouvé et corrigé ;
       garde-fou : une erreur d'affichage n'efface plus toute l'appli
-  [!] Renseigner les boîtes aux lettres (BAL) dans les fiches : sans elles,
-      le nombre de flyers ne peut pas être estimé (0 % aujourd'hui)
+  [x] Boîtes aux lettres : registre des copropriétés (ANAH) pour 3 760
+      bâtiments, estimation (surface × étages) pour 3 171 autres, saisie à
+      la main prioritaire ; provenance affichée partout (Saisie / Registre /
+      Estimation) ; script scripts/donnees-bal.py pour mettre à jour
   [ ] Retour sur investissement : relier les contacts reçus aux campagnes
   [ ] Couvrir d'autres arrondissements
   [ ] Redécouper un bâtiment fusionné par OpenStreetMap
@@ -148,3 +158,7 @@ JOURNAL
 2026-10-07  Tableau de bord réalisé. Constat sur les vraies données : 2
             passages sur les 12 dernières semaines (120 sur 6 mois), aucune
             BAL renseignée, passages récents sans prénom.
+2026-10-07  Tournées et boîtes aux lettres réalisées (choix : BAL issues du
+            registre des copropriétés + saisie + estimation signalée ; ordre
+            de passage = distance à pied minimale ; tournée gardée sur le
+            téléphone).

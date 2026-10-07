@@ -21,15 +21,18 @@ export function buildGraph(data) {
   const cosLat = Math.cos((lat[0] * Math.PI) / 180);
   const meters = (a, b) => Math.hypot((lat[a] - lat[b]) * M_PER_DEG_LAT, (lng[a] - lng[b]) * M_PER_DEG_LAT * cosLat);
 
-  const adj = Array.from({ length: n }, () => []); // [voisin, coût, voie, …]
+  // [voisin, coût, voie, mètres, …] : le coût pénalise les chemins (tracé des
+  // secteurs), les mètres servent aux itinéraires à pied (tournées).
+  const adj = Array.from({ length: n }, () => []);
   const segments = []; // [a, b, voie]
   data.ways.forEach(([kind, , ids], w) => {
     for (let k = 1; k < ids.length; k++) {
       const a = ids[k - 1];
       const b = ids[k];
-      const cost = meters(a, b) * COST[kind];
-      adj[a].push(b, cost, w);
-      adj[b].push(a, cost, w);
+      const m = meters(a, b);
+      const cost = m * COST[kind];
+      adj[a].push(b, cost, w, m);
+      adj[b].push(a, cost, w, m);
       segments.push([a, b, w]);
     }
   });
@@ -79,8 +82,13 @@ export function snap(g, { lat, lng }, maxMeters = 45) {
   return best;
 }
 
+export const STRIDE = 4; // taille d'une entrée de g.adj
+export const WEIGHT_COST = 1; // coût du tracé (chemins pénalisés)
+export const WEIGHT_METERS = 3; // distance à pied réelle
+
 // Plus court chemin (Dijkstra) entre deux points du plan : liste d'indices, ou null.
-export function route(g, from, to) {
+// weight : WEIGHT_COST (tracé des secteurs) ou WEIGHT_METERS (à pied).
+export function route(g, from, to, weight = WEIGHT_COST) {
   if (from === to) return [from];
   const dist = new Float64Array(g.n).fill(Infinity);
   const prev = new Int32Array(g.n).fill(-1);
@@ -92,9 +100,9 @@ export function route(g, from, to) {
     if (u === to) break;
     if (d > dist[u]) continue;
     const edges = g.adj[u];
-    for (let k = 0; k < edges.length; k += 3) {
+    for (let k = 0; k < edges.length; k += STRIDE) {
       const v = edges[k];
-      const nd = d + edges[k + 1];
+      const nd = d + edges[k + weight];
       if (nd < dist[v]) {
         dist[v] = nd;
         prev[v] = u;
@@ -106,6 +114,34 @@ export function route(g, from, to) {
   const path = [];
   for (let u = to; u !== -1; u = prev[u]) path.push(u);
   return path.reverse();
+}
+
+// Distances à pied (mètres) depuis `from` vers chacun des `targets` (indices).
+export function walkingDistances(g, from, targets) {
+  const dist = new Float64Array(g.n).fill(Infinity);
+  const wanted = new Set(targets);
+  const heap = new MinHeap();
+  dist[from] = 0;
+  heap.push(0, from);
+  let remaining = wanted.size;
+  while (heap.size && remaining > 0) {
+    const [d, u] = heap.pop();
+    if (d > dist[u]) continue;
+    if (wanted.has(u)) {
+      wanted.delete(u);
+      remaining--;
+    }
+    const edges = g.adj[u];
+    for (let k = 0; k < edges.length; k += STRIDE) {
+      const v = edges[k];
+      const nd = d + edges[k + WEIGHT_METERS];
+      if (nd < dist[v]) {
+        dist[v] = nd;
+        heap.push(nd, v);
+      }
+    }
+  }
+  return targets.map((t) => dist[t]);
 }
 
 export const coords = (g, path) => path.map((i) => [g.lat[i], g.lng[i]]);
@@ -140,7 +176,7 @@ export function nearestSegment(g, [lat, lng], maxMeters = 45) {
         bestD = d;
         const pa = [g.lat[a], g.lng[a]];
         const pb = [g.lat[b], g.lng[b]];
-        best = { key: segmentKey(pa, pb), a: pa, b: pb, name: g.names[g.ways[w][1]] ?? null };
+        best = { key: segmentKey(pa, pb), a: pa, b: pb, ia: a, ib: b, t, name: g.names[g.ways[w][1]] ?? null };
       }
     }
   }
