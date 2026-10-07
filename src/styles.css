@@ -17,6 +17,7 @@
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --bar-h: calc(126px + var(--safe-bottom));
+  --draw-bar-h: calc(196px + var(--safe-bottom)); /* barre de dessin : 3 rangées */
 }
 
 html,
@@ -806,4 +807,13 @@ textarea {
    toucher) visible au-dessus. */
 .sheet.compact {
   max-height: 45vh;
+}
+
+/* Pendant le dessin, la barre est plus haute : notifications et attribution
+   passent au-dessus. */
+.is-drawing .toasts {
+  bottom: calc(var(--draw-bar-h) + 12px);
+}
+.is-drawing .leaflet-bottom {
+  bottom: var(--draw-bar-h);
 }

@@ -92,20 +92,19 @@ modifier et supprimer les données, y compris les codes d'entrée.
       coupure, 31 vérifications de l'étape 4 sans régression
   [!] Tester sur le terrain : ouvrir la carte une fois avec du réseau, puis
       prospecter dans un hall ou un sous-sol
-  [x] Secteurs — PRÊT, À METTRE EN LIGNE :
-      dessin en touchant les carrefours, le trait suit les rues (plan OSM
-      des rues du 15e, trottoirs exclus) ; une couleur et un nom par
-      secteur ; ligne côté intérieur par défaut ; toucher une ligne permet
-      de la passer de l'autre côté ou d'« Intervertir » avec le secteur
-      voisin (la rangée d'immeubles longée appartient au secteur) ;
-      responsable ; avancement (% de bâtiments prospectés < 30 jours) et
-      boîtes aux lettres connues ; filtre « Secteur » ; secteur affiché
-      dans la fiche bâtiment ; mis à jour en direct, consultable hors ligne
-      Tests : 56 tests unitaires, 22 vérifications sur de vraies rues
-      (rue des Entrepreneurs), étapes 4 et hors ligne sans régression
-  [!] Exécuter la migration 05 dans Supabase (SQL Editor), puis mettre en ligne
-  [ ] Secteurs : modifier un tracé existant (aujourd'hui : supprimer et
-      redessiner)
+  [x] Secteurs (1re version, contours fermés) — en ligne (commit 7234e3e)
+  [x] Secteurs en traits ouverts — PRÊT, À METTRE EN LIGNE :
+      un secteur = des tronçons de rue, en un ou plusieurs traits qui ne se
+      rejoignent pas forcément (« Lever le crayon ») ; le trait suit les
+      rues ; chaque tronçon couvre les deux côtés (ligne au milieu de la
+      rue) ou un seul (ligne décalée vers la rangée) ; rue partagée avec un
+      autre secteur : « Partager la rue » puis « Intervertir » ; supprimer
+      un tronçon ; « Compléter le tracé » d'un secteur existant ; avancement,
+      boîtes aux lettres, filtre, secteur dans la fiche bâtiment
+      Tests : 59 tests unitaires, 21 vérifications sur de vraies rues,
+      étapes 4 et hors ligne sans régression
+  [!] Exécuter la migration 06 dans Supabase (SQL Editor), puis mettre en
+      ligne aussitôt (l'ancienne version ne sait plus créer de secteur)
   [~] Préparer une tournée : BAL connues par secteur (fait) ; reste la
       liste des bâtiments à faire et le nombre de flyers à prévoir
   [ ] Tableau de bord : flyers par semaine, par collègue, par type
@@ -131,3 +130,5 @@ JOURNAL
 2026-10-09  Mode hors ligne en ligne (commit fae9e8d). Secteurs réalisés
             (choix : dessin qui suit les rues, ligne = rangée attribuée,
             « Intervertir » échange les rangées). Migration 05 prête.
+2026-10-10  Secteurs revus en traits ouverts (demande : « une succession de
+            traits qui parfois ne rejoignent rien »). Migration 06 prête.

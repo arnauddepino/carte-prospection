@@ -2,32 +2,34 @@ import { Fragment, useMemo } from "react";
 import L from "leaflet";
 import { CircleMarker, Marker, Polyline } from "react-leaflet";
 import "leaflet-polylineoffset";
-import { legOffset, sectorRing } from "../lib/secteurs";
+import { legOffset, sectorLabelPosition } from "../lib/secteurs";
 
-// Contour d'un secteur : une ligne colorée par tronçon, décalée du côté de la
-// rangée d'immeubles qu'elle désigne, avec un liseré blanc pour la lisibilité.
-// Les lignes ne réagissent au toucher que si `interactive` (gestion des secteurs).
+// Tronçons d'un secteur : ligne au milieu de la rue si les deux côtés sont
+// couverts, décalée vers la rangée d'immeubles concernée sinon. Liseré blanc
+// pour la lisibilité. Les lignes ne réagissent au toucher que si `interactive`
+// (gestion des secteurs).
 function SectorLines({ sector, interactive, onLegTap }) {
-  return sector.legs.map((leg, k) => {
-    const offset = legOffset(sector, k);
-    const key = `${sector.id}-${k}-${offset}-${interactive}`;
+  return sector.troncons.map((t, i) => {
+    const offset = legOffset(t);
+    const weight = t.cote === "deux" ? 5 : 4;
+    const key = `${sector.id}-${i}-${t.cote}-${t.coords.length}-${interactive}`;
     return (
       <Fragment key={key}>
-        <Polyline positions={leg} offset={offset} interactive={false} pathOptions={{ color: "#ffffff", weight: 7, opacity: 0.9 }} />
+        <Polyline positions={t.coords} offset={offset} interactive={false} pathOptions={{ color: "#ffffff", weight: weight + 3, opacity: 0.9 }} />
         <Polyline
-          positions={leg}
+          positions={t.coords}
           offset={offset}
           interactive={interactive}
           bubblingMouseEvents={false}
-          pathOptions={{ color: sector.couleur, weight: 4, opacity: 1 }}
-          eventHandlers={interactive ? { click: () => onLegTap(sector, k) } : undefined}
+          pathOptions={{ color: sector.couleur, weight, opacity: 1 }}
+          eventHandlers={interactive ? { click: () => onLegTap(sector, i) } : undefined}
         />
       </Fragment>
     );
   });
 }
 
-// Nom du secteur au centre de son contour (second repère, en plus de la couleur).
+// Nom du secteur sur son plus long tronçon (second repère, en plus de la couleur).
 function SectorLabel({ sector }) {
   const icon = useMemo(() => {
     const div = document.createElement("div");
@@ -36,11 +38,9 @@ function SectorLabel({ sector }) {
     div.textContent = sector.nom;
     return L.divIcon({ html: div.outerHTML, className: "", iconSize: null });
   }, [sector.nom, sector.couleur]);
-  const center = useMemo(() => {
-    const ring = sectorRing(sector);
-    return [ring.reduce((s, p) => s + p[0], 0) / ring.length, ring.reduce((s, p) => s + p[1], 0) / ring.length];
-  }, [sector]);
-  return <Marker position={center} icon={icon} interactive={false} keyboard={false} />;
+  const position = sectorLabelPosition(sector);
+  if (!position) return null;
+  return <Marker position={position} icon={icon} interactive={false} keyboard={false} />;
 }
 
 export default function SectorsLayer({ secteurs, interactive, onLegTap, draft }) {
@@ -66,9 +66,9 @@ export default function SectorsLayer({ secteurs, interactive, onLegTap, draft })
           ))}
           {draft.points.map((p, i) => (
             <CircleMarker
-              key={`pt-${i}-${p[0]}-${p[1]}`}
-              center={p}
-              radius={i === 0 ? 10 : 6}
+              key={`pt-${i}-${p.latlng[0]}-${p.latlng[1]}`}
+              center={p.latlng}
+              radius={p.last ? 9 : 6}
               interactive={false}
               pathOptions={{ color: "#ffffff", weight: 2, fillColor: draft.couleur, fillOpacity: 1 }}
             />

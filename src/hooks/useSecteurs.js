@@ -5,10 +5,13 @@ import { buildGraph } from "../lib/streets";
 
 const CACHE_KEY = "prospection.cache.secteurs";
 
+// Un secteur sans tronçons (copie locale d'une ancienne version) reste utilisable.
+const normalize = (s) => ({ ...s, troncons: Array.isArray(s.troncons) ? s.troncons : [] });
+
 // Secteurs, mis à jour en direct, avec une copie locale pour les consulter
 // hors ligne. Créer, modifier ou supprimer un secteur nécessite le réseau.
 export function useSecteurs() {
-  const [secteurs, setSecteurs] = useState(() => readJson(CACHE_KEY, []));
+  const [secteurs, setSecteurs] = useState(() => readJson(CACHE_KEY, []).map(normalize));
 
   const store = useCallback((updater) => {
     setSecteurs((list) => {
@@ -21,7 +24,7 @@ export function useSecteurs() {
   const load = useCallback(async () => {
     const { data, error } = await supabase.from("secteurs").select("*").order("id");
     if (error) console.error("Chargement secteurs :", error);
-    else store(() => data);
+    else store(() => data.map(normalize));
   }, [store]);
 
   useEffect(() => {
@@ -30,7 +33,7 @@ export function useSecteurs() {
       .channel("secteurs")
       .on("postgres_changes", { event: "*", schema: "public", table: "secteurs" }, (payload) => {
         if (payload.eventType === "DELETE") store((list) => list.filter((s) => s.id !== payload.old.id));
-        else store((list) => [...list.filter((s) => s.id !== payload.new.id), payload.new].sort((a, b) => a.id - b.id));
+        else store((list) => [...list.filter((s) => s.id !== payload.new.id), normalize(payload.new)].sort((a, b) => a.id - b.id));
       })
       .subscribe();
     window.addEventListener("online", load);
@@ -51,7 +54,7 @@ export function useSecteurs() {
         console.error("Enregistrement secteur :", error);
         return { error };
       }
-      store((list) => [...list.filter((s) => s.id !== data.id), data].sort((a, b) => a.id - b.id));
+      store((list) => [...list.filter((s) => s.id !== data.id), normalize(data)].sort((a, b) => a.id - b.id));
       return { error: null, secteur: data };
     },
     [store]

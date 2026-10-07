@@ -27,7 +27,7 @@ export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw
       />
       <div className="sheet-body">
         {secteurs.length === 0 ? (
-          <p className="hint">Aucun secteur. Dessinez le premier en suivant les rues.</p>
+          <p className="hint">Aucun secteur. Dessinez le premier en touchant les carrefours des rues à couvrir.</p>
         ) : (
           <ul className="sectors">
             {secteurs.map((s) => {
@@ -56,7 +56,8 @@ export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw
           </ul>
         )}
         <p className="hint">
-          Pour choisir le côté de rue d’un secteur, touchez sa ligne sur la carte pendant que ce panneau est ouvert.
+          Pour choisir les côtés de rue couverts ou supprimer un tronçon, touchez une ligne sur la carte pendant que
+          ce panneau est ouvert.
         </p>
         <label className="checkbox">
           <input type="checkbox" checked={visible} onChange={(e) => onToggleVisible(e.target.checked)} />
@@ -71,7 +72,7 @@ export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw
 }
 
 // Création / modification d'un secteur (nom, couleur, responsable).
-export function SectorEditSheet({ sector, auteurs, onSave, onDelete, onZoom, onClose }) {
+export function SectorEditSheet({ sector, auteurs, onSave, onDelete, onZoom, onExtend, onClose }) {
   const [form, setForm] = useState({ nom: sector.nom, couleur: sector.couleur, responsable: sector.responsable ?? "" });
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
@@ -79,7 +80,11 @@ export function SectorEditSheet({ sector, auteurs, onSave, onDelete, onZoom, onC
 
   return (
     <section className="sheet" aria-label={isNew ? "Nouveau secteur" : "Secteur"}>
-      <SheetHeader title={isNew ? "Nouveau secteur" : sector.nom} onClose={onClose} />
+      <SheetHeader
+        title={isNew ? "Nouveau secteur" : sector.nom}
+        subtitle={`${sector.troncons.length} tronçon${sector.troncons.length > 1 ? "s" : ""} de rue`}
+        onClose={onClose}
+      />
       <form
         className="sheet-body"
         onSubmit={async (e) => {
@@ -133,9 +138,14 @@ export function SectorEditSheet({ sector, auteurs, onSave, onDelete, onZoom, onC
           {isNew ? "Créer le secteur" : "Enregistrer"}
         </button>
         {!isNew && (
-          <button type="button" className="button secondary" onClick={() => onZoom(sector)}>
-            Voir le secteur sur la carte
-          </button>
+          <div className="field-inline">
+            <button type="button" className="button secondary grow" onClick={() => onZoom(sector)}>
+              Voir sur la carte
+            </button>
+            <button type="button" className="button secondary grow" onClick={() => onExtend(sector)}>
+              Compléter le tracé
+            </button>
+          </div>
         )}
         {!isNew &&
           (confirm ? (
@@ -152,54 +162,86 @@ export function SectorEditSheet({ sector, auteurs, onSave, onDelete, onZoom, onC
   );
 }
 
-// Un tronçon touché sur la carte : changer de côté, ou intervertir avec le
-// secteur voisin qui partage la même rue.
-export function LegSheet({ sector, streetName, inverted, neighbors, onFlip, onSwap, onClose }) {
+// Un tronçon touché sur la carte : côtés de rue couverts, rue partagée avec un
+// secteur voisin, suppression.
+export function LegSheet({ sector, troncon, streetName, neighbors, onSetCote, onShare, onSwap, onDelete, onClose }) {
+  const [confirm, setConfirm] = useState(false);
+  const single = troncon.cote !== "deux";
   return (
     <section className="sheet compact" aria-label="Tronçon de secteur">
       <SheetHeader
         title={streetName ?? "Tronçon"}
-        subtitle={`${sector.nom} · ligne ${inverted ? "de l’autre côté de la rue" : "côté intérieur"}`}
+        subtitle={`${sector.nom} · ${single ? "un seul côté de la rue" : "les deux côtés de la rue"}`}
         onClose={onClose}
       />
       <div className="sheet-body">
-        <p className="hint">
-          La rangée d’immeubles longée par la ligne colorée appartient au secteur.
-        </p>
-        {neighbors.map((n) => (
-          <button key={n.sector.id} type="button" className="button primary" onClick={() => onSwap(n)}>
-            Intervertir avec « {n.sector.nom} »
+        <div className="segmented" role="group" aria-label="Côtés de la rue couverts">
+          <button type="button" aria-pressed={!single} onClick={() => onSetCote("deux")}>
+            Les deux côtés
           </button>
-        ))}
-        <button type="button" className={`button ${neighbors.length ? "secondary" : "primary"}`} onClick={onFlip}>
-          {inverted ? "Remettre la ligne côté intérieur" : "Passer la ligne de l’autre côté"}
-        </button>
+          <button type="button" aria-pressed={single} onClick={() => !single && onSetCote("gauche")}>
+            Un seul côté
+          </button>
+        </div>
+        {single && (
+          <button type="button" className="button secondary" onClick={() => onSetCote(troncon.cote === "gauche" ? "droite" : "gauche")}>
+            Passer la ligne de l’autre côté de la rue
+          </button>
+        )}
+        <p className="hint">
+          {single
+            ? "La ligne longe la rangée d’immeubles couverte par le secteur."
+            : "Ligne au milieu de la rue : les immeubles des deux côtés appartiennent au secteur."}
+        </p>
+        {neighbors.map((n) =>
+          n.opposite ? (
+            <button key={n.sector.id} type="button" className="button primary" onClick={() => onSwap(n)}>
+              Intervertir les côtés avec « {n.sector.nom} »
+            </button>
+          ) : (
+            <button key={n.sector.id} type="button" className="button primary" onClick={() => onShare(n)}>
+              Partager la rue avec « {n.sector.nom} » (un côté chacun)
+            </button>
+          )
+        )}
+        {confirm ? (
+          <button type="button" className="button danger" onClick={onDelete}>
+            Confirmer la suppression du tronçon
+          </button>
+        ) : (
+          <button type="button" className="button text-danger" onClick={() => setConfirm(true)}>
+            Supprimer ce tronçon
+          </button>
+        )}
       </div>
     </section>
   );
 }
 
 // Barre de dessin, à la place de la barre du bas.
-export function DrawBar({ color, points, onUndo, onFinish, onCancel }) {
+export function DrawBar({ color, legs, penDown, onUndo, onLiftPen, onFinish, onCancel }) {
   return (
     <nav className="bottom-bar draw-bar" aria-label="Dessin du secteur">
       <p className="draw-hint">
         <span className="sector-swatch" style={{ background: color }} aria-hidden="true" />
-        {points === 0
-          ? "Touchez un premier carrefour."
-          : points < 3
-            ? "Touchez le carrefour suivant : le trait suit les rues."
-            : "Continuez, ou touchez le premier point pour fermer le secteur."}
+        {!penDown
+          ? "Touchez le carrefour où commence le trait."
+          : "Touchez le carrefour suivant : le trait suit les rues."}
       </p>
+      <div className="bar-row">
+        <button type="button" className="button secondary grow" disabled={!penDown && legs === 0} onClick={onUndo}>
+          Annuler le point
+        </button>
+        <button type="button" className="button secondary grow" disabled={!penDown} onClick={onLiftPen}>
+          Lever le crayon
+        </button>
+      </div>
       <div className="bar-row">
         <button type="button" className="button secondary grow" onClick={onCancel}>
           Abandonner
         </button>
-        <button type="button" className="button secondary grow" disabled={points === 0} onClick={onUndo}>
-          Annuler le point
-        </button>
-        <button type="button" className="button primary grow" disabled={points < 3} onClick={onFinish}>
-          Fermer
+        <button type="button" className="button primary grow" disabled={legs === 0} onClick={onFinish}>
+          Terminer ({legs} tronçon{legs > 1 ? "s" : ""})
         </button>
       </div>
     </nav>

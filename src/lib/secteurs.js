@@ -1,9 +1,14 @@
 import { nearestSegment, segmentKey } from "./streets";
 
-// Secteurs : contour fermé qui suit les rues, découpé en « tronçons » (legs)
-// entre les points posés par l'utilisateur. Chaque tronçon est dessiné du côté
-// intérieur du secteur ; « inversé », il passe de l'autre côté de la rue : la
-// rangée d'immeubles d'en face est alors rattachée au secteur.
+// Secteurs : une suite de tronçons de rue (traits qui suivent les rues et ne
+// se rejoignent pas forcément). Chaque tronçon couvre :
+//   • "deux"   : les deux côtés de la rue (ligne au milieu de la rue) ;
+//   • "gauche" / "droite" : un seul côté, par rapport au sens de tracé (ligne
+//     décalée vers la rangée d'immeubles concernée).
+// Un bâtiment appartient au secteur si la rue la plus proche fait partie d'un
+// de ses tronçons, du côté couvert.
+//
+// troncon = { coords: [[lat, lng], …], cote: "deux" | "gauche" | "droite" }
 
 // Couleurs des secteurs, dans l'ordre d'attribution (validées entre voisines ;
 // le nom affiché sur la carte sert de second repère). Pas de bleu : c'est la
@@ -20,40 +25,43 @@ export const SECTOR_COLORS = [
 
 export const nextSectorColor = (sectors) => SECTOR_COLORS[sectors.length % SECTOR_COLORS.length].value;
 
-// Contour fermé du secteur (tronçons mis bout à bout).
-export function sectorRing(sector) {
-  const ring = [];
-  sector.legs.forEach((leg, k) => ring.push(...(k === 0 ? leg : leg.slice(1))));
-  return ring;
-}
-
-// Aire signée (x = longitude, y = latitude) : positive = sens trigonométrique,
-// l'intérieur est alors à gauche du sens de tracé.
-export function signedArea(ring) {
-  let a = 0;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    a += ring[j][1] * ring[i][0] - ring[i][1] * ring[j][0];
-  }
-  return a / 2;
-}
-
-const interiorIsLeft = (sector) => signedArea(sectorRing(sector)) > 0;
+export const otherSide = (cote) => (cote === "gauche" ? "droite" : "gauche");
 
 // Décalage d'affichage d'un tronçon, en pixels (négatif = à gauche du sens de
-// tracé) : vers l'intérieur par défaut, vers l'extérieur s'il est inversé.
-export function legOffset(sector, k, px = 5) {
-  const inside = interiorIsLeft(sector) ? -px : px;
-  return sector.inverses?.includes(k) ? -inside : inside;
+// tracé ; 0 = au milieu de la rue pour les deux côtés).
+export function legOffset(troncon, px = 5) {
+  if (troncon.cote === "gauche") return -px;
+  if (troncon.cote === "droite") return px;
+  return 0;
 }
 
-export function pointInRing([lat, lng], ring) {
-  let inside = false;
-  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
-    const [yi, xi] = ring[i];
-    const [yj, xj] = ring[j];
-    if (yi > lat !== yj > lat && lng < ((xj - xi) * (lat - yi)) / (yj - yi) + xi) inside = !inside;
+// Tous les points d'un secteur (pour cadrer la carte).
+export const sectorPoints = (sector) => sector.troncons.flatMap((t) => t.coords);
+
+// Position du nom sur la carte : au milieu du plus long tronçon.
+export function sectorLabelPosition(sector) {
+  const longest = sector.troncons.reduce((a, t) => (t.coords.length > (a?.coords.length ?? 0) ? t : a), null);
+  return longest ? longest.coords[Math.floor(longest.coords.length / 2)] : null;
+}
+
+// Deux tronçons passent-ils par la même rue ? Renvoie null si non, sinon
+// { sameDirection } (tracés dans le même sens ou non).
+export function sharedStreet(a, b) {
+  const keysB = new Map(b.coords.slice(1).map((q, i) => [segmentKey(b.coords[i], q), [b.coords[i], q]]));
+  for (let i = 1; i < a.coords.length; i++) {
+    const seg = keysB.get(segmentKey(a.coords[i - 1], a.coords[i]));
+    if (seg) {
+      const same = seg[0][0] === a.coords[i - 1][0] && seg[0][1] === a.coords[i - 1][1];
+      return { sameDirection: same };
+    }
   }
-  return inside;
+  return null;
+}
+
+// Côté qu'il faut donner à b pour qu'il couvre la rangée opposée à celle de a.
+export function oppositeCote(coteA, shared) {
+  const single = coteA === "deux" ? "gauche" : coteA;
+  return shared.sameDirection ? otherSide(single) : single;
 }
 
 function bbox(points) {
@@ -68,43 +76,27 @@ function bbox(points) {
 }
 const inBox = (b, [la, ln], m = 0) => la >= b.s - m && la <= b.n + m && ln >= b.w - m && ln <= b.e + m;
 
-// Côté d'un point par rapport au tronçon p→q : true = à droite.
-function isRight(p, q, [lat, lng], cosLat) {
+// Côté d'un point par rapport au tronçon p→q : "gauche" ou "droite".
+function sideOf(p, q, [lat, lng], cosLat) {
   const cross = (q[1] - p[1]) * cosLat * (lat - p[0]) - (q[0] - p[0]) * (lng - p[1]) * cosLat;
-  return cross < 0;
+  return cross > 0 ? "gauche" : "droite";
 }
 
 // Secteur de chaque bâtiment : Map id_batiment → id du secteur.
-//   1. un bâtiment à l'intérieur d'un contour appartient au secteur ;
-//   2. un tronçon inversé rattache au secteur la rangée d'en face, c'est-à-dire
-//      les bâtiments de l'autre côté dont la rue la plus proche est ce tronçon.
-// centers : Map id_batiment → [lat, lng] ; graph : plan des rues (pour l'étape 2).
+// centers : Map id_batiment → [lat, lng] ; graph : plan des rues.
+// Si deux secteurs couvrent la même rangée, le premier créé l'emporte.
 export function assignBuildings(sectors, centers, graph) {
   const result = new Map();
-  const rings = sectors.map((s) => {
-    const ring = sectorRing(s);
-    return { id: s.id, ring, box: bbox(ring) };
-  });
-  for (const [id, c] of centers) {
-    const hit = rings.find((r) => inBox(r.box, c) && pointInRing(c, r.ring));
-    if (hit) result.set(id, hit.id);
-  }
-
   if (!graph) return result;
-  // Tronçons de rue revendiqués du côté extérieur.
-  const claims = new Map(); // clé de tronçon → [{ sectorId, p, q, outerIsRight }]
+  const claims = new Map(); // clé de tronçon de rue → [{ sectorId, p, q, cote }]
   const claimed = [];
   for (const s of sectors) {
-    if (!s.inverses?.length) continue;
-    const outerIsRight = interiorIsLeft(s);
-    for (const k of s.inverses) {
-      const leg = s.legs[k];
-      if (!leg) continue;
-      claimed.push(...leg);
-      for (let i = 1; i < leg.length; i++) {
-        const key = segmentKey(leg[i - 1], leg[i]);
+    for (const t of s.troncons ?? []) {
+      claimed.push(...t.coords);
+      for (let i = 1; i < t.coords.length; i++) {
+        const key = segmentKey(t.coords[i - 1], t.coords[i]);
         if (!claims.has(key)) claims.set(key, []);
-        claims.get(key).push({ sectorId: s.id, p: leg[i - 1], q: leg[i], outerIsRight });
+        claims.get(key).push({ sectorId: s.id, p: t.coords[i - 1], q: t.coords[i], cote: t.cote });
       }
     }
   }
@@ -114,9 +106,10 @@ export function assignBuildings(sectors, centers, graph) {
   for (const [id, c] of centers) {
     if (!inBox(zone, c, margin)) continue;
     const seg = nearestSegment(graph, c);
-    for (const claim of seg ? claims.get(seg.key) ?? [] : []) {
-      if (isRight(claim.p, claim.q, c, graph.cosLat) === claim.outerIsRight) result.set(id, claim.sectorId);
-    }
+    const onStreet = seg && claims.get(seg.key);
+    if (!onStreet) continue;
+    const claim = onStreet.find((cl) => cl.cote === "deux" || cl.cote === sideOf(cl.p, cl.q, c, graph.cosLat));
+    if (claim) result.set(id, claim.sectorId);
   }
   return result;
 }

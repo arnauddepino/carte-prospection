@@ -10,8 +10,16 @@ import { useToasts } from "./hooks/useToasts";
 import { useLocate } from "./hooks/useLocate";
 import { loadStreets, useSecteurs } from "./hooks/useSecteurs";
 import { useSectorDraft } from "./hooks/useSectorDraft";
-import { assignBuildings, nextSectorColor, sectorRing, sectorStats } from "./lib/secteurs";
-import { nearestSegment, segmentKey } from "./lib/streets";
+import {
+  assignBuildings,
+  nextSectorColor,
+  oppositeCote,
+  otherSide,
+  sectorPoints,
+  sectorStats,
+  sharedStreet,
+} from "./lib/secteurs";
+import { nearestSegment } from "./lib/streets";
 import { downloadText, fichesCsv, passagesCsv } from "./lib/csv";
 import { featureId, formToPayload, hasFilters, NO_FILTERS, passagePayload } from "./lib/prospections";
 
@@ -72,9 +80,6 @@ function MapClicks({ onClick }) {
   return null;
 }
 
-// Clés des tronçons de rue d'une ligne (pour repérer une rue partagée).
-const legKeys = (leg) => new Set(leg.slice(1).map((q, i) => segmentKey(leg[i], q)));
-
 function ProspectionMap() {
   const [map, setMap] = useState(null);
   const [buildings, setBuildings] = useState(null);
@@ -103,7 +108,7 @@ function ProspectionMap() {
   const [auteur, setAuteur] = useStoredState("prospection.auteur", null);
   const [editingAuteur, setEditingAuteur] = useState(false);
   // null | { kind: "building", building } | { kind: "settings" } | { kind: "sectors" }
-  // | { kind: "sector", sector } | { kind: "leg", sectorId, k, neighbors, streetName }
+  // | { kind: "sector", sector } | { kind: "leg", sectorId, i, neighbors, streetName }
   const [sheet, setSheet] = useState(null);
   const { secteurs, save: saveSecteur, remove: removeSecteur } = useSecteurs();
   const [sectorsVisible, setSectorsVisible] = useStoredState("prospection.secteurs.visibles", true);
@@ -125,7 +130,7 @@ function ProspectionMap() {
 
   // ─── Secteurs : rattachement des bâtiments et avancement ───
   const centers = useMemo(() => buildingCenters(buildings), [buildings]);
-  const needsStreets = draft.active || secteurs.some((s) => s.inverses?.length) || sheet?.kind === "leg";
+  const needsStreets = draft.active || secteurs.length > 0;
   useEffect(() => {
     if (needsStreets && !graph) loadStreets().then(setGraph).catch((e) => console.error("Plan des rues :", e));
   }, [needsStreets, graph]);
@@ -245,10 +250,11 @@ function ProspectionMap() {
   };
 
   // ─── Secteurs : dessin, enregistrement, côtés de rue ───
-  const startDrawing = () => {
+  // existing : secteur que l'on complète (sinon nouveau secteur).
+  const startDrawing = (existing = null) => {
     setSheet(null);
-    draft.start(nextSectorColor(secteurs));
-    show({ kind: "info", text: "Touchez les carrefours dans l’ordre : le trait suit les rues." });
+    draft.start(existing?.couleur ?? nextSectorColor(secteurs), existing?.id ?? null);
+    show({ kind: "info", text: "Touchez les carrefours : le trait suit les rues. « Lever le crayon » pour un trait séparé." });
   };
 
   const handleDrawClick = async (latlng) => {
@@ -260,24 +266,25 @@ function ProspectionMap() {
     const result = draft.addPoint(g, latlng);
     if (result.error === "far") show({ kind: "info", text: "Touchez plus près d’une rue ou d’un carrefour." });
     if (result.error === "unreachable") show({ kind: "error", text: "Aucun chemin par les rues jusqu’à ce point." });
-    if (result.closed) finishDrawing();
   };
 
-  const finishDrawing = () => {
-    const contour = draft.close(graph);
-    if (!contour) {
-      show({ kind: "error", text: "Impossible de refermer le secteur par les rues." });
+  const finishDrawing = async () => {
+    const nouveaux = draft.troncons(graph);
+    const existing = secteurs.find((s) => s.id === draft.sectorId);
+    if (existing) {
+      const { error } = await saveSecteur({ ...existing, troncons: [...existing.troncons, ...nouveaux] });
+      if (error) {
+        show({ kind: "error", text: `Tracé non enregistré. ${NETWORK_HINT}` });
+        return;
+      }
+      show({ kind: "success", text: `✓ ${nouveaux.length} tronçon${nouveaux.length > 1 ? "s" : ""} ajouté${nouveaux.length > 1 ? "s" : ""} à « ${existing.nom} »` });
+      draft.cancel();
+      setSheet({ kind: "sectors" });
       return;
     }
     setSheet({
       kind: "sector",
-      sector: {
-        nom: `Secteur ${secteurs.length + 1}`,
-        couleur: draft.view(graph).couleur,
-        responsable: auteur,
-        inverses: [],
-        ...contour,
-      },
+      sector: { nom: `Secteur ${secteurs.length + 1}`, couleur: draft.couleur, responsable: auteur, troncons: nouveaux },
     });
   };
 
@@ -303,48 +310,70 @@ function ProspectionMap() {
   };
 
   const zoomToSector = (sector) => {
-    map?.fitBounds(sectorRing(sector), { paddingTopLeft: [24, 80], paddingBottomRight: [24, map.getSize().y * 0.5] });
+    const points = sectorPoints(sector);
+    if (points.length) map?.fitBounds(points, { paddingTopLeft: [24, 80], paddingBottomRight: [24, map.getSize().y * 0.5] });
   };
 
   // Ligne d'un secteur touchée : nom de la rue et secteurs qui la partagent.
-  const handleLegTap = async (sector, k) => {
+  const handleLegTap = async (sector, i) => {
     const g = graph ?? (await loadStreets().catch(() => null));
-    const leg = sector.legs[k];
-    const keys = legKeys(leg);
+    const troncon = sector.troncons[i];
     const neighbors = [];
     for (const other of secteurs) {
       if (other.id === sector.id) continue;
-      other.legs.forEach((l, k2) => {
-        if ([...legKeys(l)].some((key) => keys.has(key))) neighbors.push({ sectorId: other.id, k: k2 });
+      other.troncons.forEach((t, i2) => {
+        const shared = sharedStreet(troncon, t);
+        if (shared) neighbors.push({ sectorId: other.id, i: i2, shared });
       });
     }
-    const mid = leg[Math.floor(leg.length / 2)];
-    const streetName = g ? nearestSegment(g, mid)?.name : null;
-    setSheet({ kind: "leg", sectorId: sector.id, k, neighbors, streetName });
+    const mid = troncon.coords[Math.floor(troncon.coords.length / 2)];
+    setSheet({ kind: "leg", sectorId: sector.id, i, neighbors, streetName: g ? nearestSegment(g, mid)?.name : null });
   };
 
-  const setInverted = (sector, k, inverted) => {
-    const inverses = new Set(sector.inverses ?? []);
-    if (inverted) inverses.add(k);
-    else inverses.delete(k);
-    return saveSecteur({ ...sector, inverses: [...inverses].sort((a, b) => a - b) });
-  };
+  const withCote = (sector, i, cote) => ({
+    ...sector,
+    troncons: sector.troncons.map((t, k) => (k === i ? { ...t, cote } : t)),
+  });
 
-  const handleFlip = async (sector, k) => {
-    const { error } = await setInverted(sector, k, !sector.inverses?.includes(k));
-    show(error ? { kind: "error", text: `Modification impossible. ${NETWORK_HINT}` } : { kind: "success", text: "✓ Côté de rue modifié" });
-  };
-
-  // Intervertir : les deux secteurs échangent les rangées de part et d'autre de la rue.
-  const handleSwap = async (sector, k, neighbor) => {
-    const other = secteurs.find((s) => s.id === neighbor.sectorId);
-    const inverted = !sector.inverses?.includes(k);
-    const results = await Promise.all([setInverted(sector, k, inverted), setInverted(other, neighbor.k, inverted)]);
+  const saveSectors = async (list, success) => {
+    const results = await Promise.all(list.map((sec) => saveSecteur(sec)));
     show(
       results.some((r) => r.error)
         ? { kind: "error", text: `Modification impossible. ${NETWORK_HINT}` }
-        : { kind: "success", text: `✓ Côtés intervertis avec « ${other.nom} »` }
+        : { kind: "success", text: success }
     );
+  };
+
+  const handleSetCote = (sector, i, cote) =>
+    saveSectors([withCote(sector, i, cote)], cote === "deux" ? "✓ Les deux côtés de la rue" : "✓ Un seul côté de la rue");
+
+  // Partager une rue : chaque secteur prend un côté.
+  const handleShare = (sector, i, n) => {
+    const other = secteurs.find((s) => s.id === n.sectorId);
+    const cote = sector.troncons[i].cote === "deux" ? "gauche" : sector.troncons[i].cote;
+    saveSectors(
+      [withCote(sector, i, cote), withCote(other, n.i, oppositeCote(cote, n.shared))],
+      `✓ Rue partagée avec « ${other.nom} »`
+    );
+  };
+
+  // Intervertir : les deux secteurs échangent les rangées de part et d'autre de la rue.
+  const handleSwap = (sector, i, n) => {
+    const other = secteurs.find((s) => s.id === n.sectorId);
+    saveSectors(
+      [withCote(sector, i, otherSide(sector.troncons[i].cote)), withCote(other, n.i, otherSide(other.troncons[n.i].cote))],
+      `✓ Côtés intervertis avec « ${other.nom} »`
+    );
+  };
+
+  const handleDeleteLeg = async (sector, i) => {
+    const { error } = await saveSecteur({ ...sector, troncons: sector.troncons.filter((_, k) => k !== i) });
+    if (error) {
+      show({ kind: "error", text: `Suppression impossible. ${NETWORK_HINT}` });
+      return;
+    }
+    show({ kind: "info", text: "Tronçon supprimé" });
+    setSheet({ kind: "sectors" });
   };
 
   const handleExport = async (what) => {
@@ -369,7 +398,7 @@ function ProspectionMap() {
   const selectedId = sheet?.kind === "building" ? sheet.building.id : null;
 
   return (
-    <div className={`app mode-${mode}${sheet ? " has-sheet" : ""}`}>
+    <div className={`app mode-${mode}${sheet ? " has-sheet" : ""}${draft.active ? " is-drawing" : ""}`}>
       <MapContainer
         ref={setMap}
         center={[48.845, 2.29]}
@@ -486,7 +515,7 @@ function ProspectionMap() {
           stats={stats}
           visible={sectorsVisible}
           onToggleVisible={setSectorsVisible}
-          onDraw={startDrawing}
+          onDraw={() => startDrawing()}
           onEdit={(sector) => setSheet({ kind: "sector", sector })}
           onClose={() => setSheet(null)}
         />
@@ -499,31 +528,44 @@ function ProspectionMap() {
           onSave={(fields) => handleSaveSector(sheet.sector, fields)}
           onDelete={handleDeleteSector}
           onZoom={zoomToSector}
+          onExtend={startDrawing}
           onClose={() => {
             if (!sheet.sector.id) draft.cancel();
             setSheet({ kind: "sectors" });
           }}
         />
       )}
-      {legSector && (
+      {legSector && legSector.troncons[sheet.i] && (
         <LegSheet
+          key={`${legSector.id}-${sheet.i}`}
           sector={legSector}
+          troncon={legSector.troncons[sheet.i]}
           streetName={sheet.streetName}
-          inverted={Boolean(legSector.inverses?.includes(sheet.k))}
           neighbors={sheet.neighbors
-            .map((n) => ({ ...n, sector: secteurs.find((s) => s.id === n.sectorId) }))
-            .filter((n) => n.sector)}
-          onFlip={() => handleFlip(legSector, sheet.k)}
-          onSwap={(n) => handleSwap(legSector, sheet.k, n)}
+            .map((n) => {
+              const other = secteurs.find((s) => s.id === n.sectorId);
+              const mine = legSector.troncons[sheet.i];
+              const theirs = other?.troncons[n.i];
+              const opposite =
+                mine.cote !== "deux" && theirs && theirs.cote === oppositeCote(mine.cote, n.shared);
+              return { ...n, sector: other, opposite };
+            })
+            .filter((n) => n.sector?.troncons[n.i])}
+          onSetCote={(cote) => handleSetCote(legSector, sheet.i, cote)}
+          onShare={(n) => handleShare(legSector, sheet.i, n)}
+          onSwap={(n) => handleSwap(legSector, sheet.i, n)}
+          onDelete={() => handleDeleteLeg(legSector, sheet.i)}
           onClose={() => setSheet({ kind: "sectors" })}
         />
       )}
 
       {draft.active && !sheet ? (
         <DrawBar
-          color={draft.view(graph)?.couleur}
-          points={draft.count}
+          color={draft.couleur}
+          legs={draft.legs}
+          penDown={draft.penDown}
           onUndo={draft.undo}
+          onLiftPen={draft.liftPen}
           onFinish={finishDrawing}
           onCancel={() => {
             draft.cancel();
