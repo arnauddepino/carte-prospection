@@ -5,11 +5,13 @@ import Icon from "./Icon";
 
 const LEGEND = [...AGE_STEPS, { color: NEVER_COLOR, label: "Jamais prospecté" }];
 
-function Swatch({ color, inaccessible = false }) {
+// partial : couleur de l'adresse la plus ancienne (hachures, comme sur la carte).
+function Swatch({ color, inaccessible = false, partial = null }) {
   const { fillColor, fillOpacity, color: stroke, dashArray } = styleFor(color, { inaccessible });
+  const background = partial ? `repeating-linear-gradient(-45deg, ${color} 0 3px, ${partial} 3px 7px)` : fillColor;
   return (
     <span className={`swatch${dashArray ? " dashed" : ""}`} style={{ borderColor: stroke }} aria-hidden="true">
-      <span style={{ background: fillColor, opacity: fillOpacity }} />
+      <span style={{ background, opacity: fillOpacity }} />
     </span>
   );
 }
@@ -61,6 +63,10 @@ export default function SettingsSheet({
           <li>
             <Swatch color={AGE_STEPS[2].color} inaccessible />
             Contour en pointillés : inaccessible
+          </li>
+          <li>
+            <Swatch color={AGE_STEPS[0].color} partial={AGE_STEPS[4].color} />
+            Hachures : fait en partie (certaines adresses seulement)
           </li>
         </ul>
 

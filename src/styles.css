@@ -1335,3 +1335,44 @@ fieldset.plain:disabled {
   font-weight: 600;
   color: var(--danger);
 }
+
+/* ─── Adresses d'un bâtiment (fiche) ─── */
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 6px;
+}
+.sheet-body .section-title h3 {
+  margin: 0;
+}
+.adresses {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.adresses li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.adresses .checkbox {
+  min-height: 44px;
+}
+.adresse-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 14px;
+  color: var(--muted);
+}
+.adresse-date .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}

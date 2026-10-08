@@ -4,6 +4,8 @@ import { reverseAddress } from "../lib/adresse";
 import { relativeDay, toDateInputValue } from "../lib/dates";
 import { ACCES, recordToForm } from "../lib/prospections";
 import { balInfo } from "../lib/bal";
+import { datesParAdresse, formatAdresses, titreAdresses } from "../lib/adresses";
+import { colorFor } from "../lib/colors";
 import { canDeleteFiche, canDeletePassage, canEditFiche } from "../lib/droits";
 import Icon from "./Icon";
 
@@ -14,7 +16,7 @@ const longDate = (iso) =>
   new Date(iso).toLocaleDateString("fr-FR", { weekday: "short", day: "numeric", month: "short", year: "numeric" });
 
 // Fiche d'un bâtiment, qui monte du bas de l'écran : accès et infos du
-// bâtiment, puis historique des passages.
+// bâtiment, adresses (s'il en a plusieurs), puis historique des passages.
 export default function BuildingSheet({
   building,
   record,
@@ -22,6 +24,7 @@ export default function BuildingSheet({
   selectedType,
   sectorName,
   balData,
+  adresses = [],
   pendingPassages = [],
   moi = { uid: null, isAdmin: false },
   onSaveFiche,
@@ -31,7 +34,8 @@ export default function BuildingSheet({
   onClose,
 }) {
   const [form, setForm] = useState(() => recordToForm(building.id, record));
-  const [address, setAddress] = useState(osmLabel(building.properties));
+  const [address, setAddress] = useState(() => osmLabel(building.properties) ?? titreAdresses(adresses));
+  const [coches, setCoches] = useState(() => new Set(adresses.map((a) => a.id))); // adresses du prochain passage
   const [passages, setPassages] = useState(null); // null = chargement
   const [historyError, setHistoryError] = useState(false);
   const [newPassage, setNewPassage] = useState(() => ({
@@ -45,8 +49,9 @@ export default function BuildingSheet({
   const reference = balInfo(building.id, null, balData); // registre ou estimation, hors saisie
   const editable = canEditFiche(record, moi);
 
-  // Adresse la plus proche de l'endroit touché.
+  // Sans adresse connue : adresse la plus proche de l'endroit touché.
   useEffect(() => {
+    if (address) return;
     let cancelled = false;
     reverseAddress(building.latlng)
       .then((label) => !cancelled && label && setAddress((current) => current ?? label))
@@ -54,6 +59,7 @@ export default function BuildingSheet({
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [building]);
 
   const loadPassages = useCallback(async () => {
@@ -72,6 +78,18 @@ export default function BuildingSheet({
     await action();
     setBusy(false);
   };
+
+  // Plusieurs adresses : le passage ajouté couvre celles cochées.
+  const multi = adresses.length > 1;
+  const dates = datesParAdresse(record, adresses);
+  const partiel = multi && coches.size < adresses.length;
+  const couvertes = (p) => p.adresses?.length && formatAdresses(adresses.filter((a) => p.adresses.includes(a.id)));
+  const toggle = (id) =>
+    setCoches((c) => {
+      const next = new Set(c);
+      if (!next.delete(id)) next.add(id);
+      return next;
+    });
 
   const field = (name) => ({
     value: form[name],
@@ -183,6 +201,40 @@ export default function BuildingSheet({
           </fieldset>
         </form>
 
+        {/* ─── Adresses d'un bâtiment dessiné d'un seul bloc ─── */}
+        {multi && (
+          <section className="sheet-section" aria-labelledby="adresses-title">
+            <div className="section-title">
+              <h3 id="adresses-title">Adresses ({adresses.length})</h3>
+              <button
+                type="button"
+                className="button text small"
+                onClick={() => setCoches(new Set(coches.size === adresses.length ? [] : adresses.map((a) => a.id)))}
+              >
+                {coches.size === adresses.length ? "Tout décocher" : "Tout cocher"}
+              </button>
+            </div>
+            <p className="hint">Cochez les adresses faites, puis ajoutez le passage ci-dessous.</p>
+            <ul className="adresses">
+              {adresses.map((a) => {
+                const d = dates.get(a.id);
+                return (
+                  <li key={a.id}>
+                    <label className="checkbox">
+                      <input type="checkbox" checked={coches.has(a.id)} onChange={() => toggle(a.id)} />
+                      {a.label}
+                    </label>
+                    <span className="adresse-date">
+                      <span className="dot" style={{ background: colorFor(d) }} aria-hidden="true" />
+                      {d ? relativeDay(d) : "jamais"}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
+
         {/* ─── Passages ─── */}
         <section className="sheet-section" aria-labelledby="passages-title">
           <h3 id="passages-title">Passages</h3>
@@ -191,7 +243,7 @@ export default function BuildingSheet({
             className="passage-add"
             onSubmit={async (e) => {
               e.preventDefault();
-              await run(() => onAddPassage(newPassage));
+              await run(() => onAddPassage({ ...newPassage, adresses: partiel ? adresses.filter((a) => coches.has(a.id)).map((a) => a.id) : null }));
               loadPassages();
             }}
           >
@@ -215,8 +267,12 @@ export default function BuildingSheet({
                 </option>
               ))}
             </select>
-            <button type="submit" className="button secondary" disabled={busy || !newPassage.date || !newPassage.typeId}>
-              Ajouter
+            <button
+              type="submit"
+              className="button secondary"
+              disabled={busy || !newPassage.date || !newPassage.typeId || (multi && coches.size === 0)}
+            >
+              {partiel ? `Ajouter (${coches.size}/${adresses.length})` : "Ajouter"}
             </button>
           </form>
 
@@ -231,6 +287,7 @@ export default function BuildingSheet({
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
+                    {couvertes(p) && <span>Seulement : {couvertes(p)}</span>}
                   </div>
                   <span className="badge">En attente d’envoi</span>
                 </li>
@@ -257,6 +314,7 @@ export default function BuildingSheet({
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
+                    {couvertes(p) && <span>Seulement : {couvertes(p)}</span>}
                   </div>
                   {!canDeletePassage(p, moi) ? null : confirm === p.id ? (
                     <button

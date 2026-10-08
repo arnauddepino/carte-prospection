@@ -45,6 +45,10 @@ describe("sélection des bâtiments d'une tournée", () => {
     expect(tourCandidates({ secteurId: 1, sectorOf, records, now, days: 30, includeInaccessible: true }).sort()).toEqual(["b", "c", "d"]);
     expect(tourCandidates({ secteurId: 1, sectorOf, records, now, days: 5 }).sort()).toEqual(["a", "b", "d"]);
   });
+  test("bâtiment fait en partie : retenu si une de ses adresses est à refaire", () => {
+    const dateOf = (id, r) => (id === "a" ? "2026-07-01T10:00:00Z" : r?.date); // « a » : une adresse oubliée
+    expect(tourCandidates({ secteurId: 1, sectorOf, records, now, days: 30, dateOf }).sort()).toEqual(["a", "b", "d"]);
+  });
 });
 
 describe("ordre de passage le plus court", () => {

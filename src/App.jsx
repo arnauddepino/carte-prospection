@@ -10,11 +10,12 @@ import { useToasts } from "./hooks/useToasts";
 import { useLocate } from "./hooks/useLocate";
 import { loadStreets, useSecteurs } from "./hooks/useSecteurs";
 import { useSectorDraft } from "./hooks/useSectorDraft";
-import { useBalData } from "./hooks/useBalData";
+import { useAdressesData, useBalData } from "./hooks/useStaticData";
 import { useAuth } from "./hooks/useAuth";
 import { canEditSectors } from "./lib/droits";
 import { balInfo, flyersPlan } from "./lib/bal";
 import { planTour, tourCandidates } from "./lib/tournee";
+import { adressesOf, formatAdresses, oldestDate } from "./lib/adresses";
 import { reverseAddress } from "./lib/adresse";
 import {
   assignBuildings,
@@ -148,6 +149,8 @@ function ProspectionMap({ auth }) {
   const typeSelectRef = useRef(null);
   const now = useNow();
   const balData = useBalData();
+  const adressesData = useAdressesData();
+  const adressesFor = useCallback((id) => adressesOf(id, adressesData), [adressesData]);
   const [tour, setTour] = useStoredState("prospection.tournee", null);
   const [tourSummary, setTourSummary] = useState(null);
   const [adresses, setAdresses] = useStoredState("prospection.cache.adresses", {});
@@ -260,8 +263,8 @@ function ProspectionMap({ auth }) {
     show({ kind: "success", text: `✓ Fiche enregistrée${later}` });
   };
 
-  const handleAddPassage = (id_batiment, { date, typeId }) => {
-    addPassage(passagePayload({ id_batiment, date, typeId, auteur }));
+  const handleAddPassage = (id_batiment, { date, typeId, adresses }) => {
+    addPassage(passagePayload({ id_batiment, date, typeId, auteur, adresses }));
     show({ kind: "success", text: `✓ Passage ajouté${later}` });
   };
 
@@ -419,9 +422,10 @@ function ProspectionMap({ auth }) {
   const tourInfo = useMemo(() => {
     if (!tour) return null;
     const since = new Date(tour.createdAt);
+    // Fait pendant la tournée : toutes ses adresses couvertes depuis le départ.
     const isDone = (id) => {
-      const r = records.get(id);
-      return Boolean(r?.date && new Date(r.date) >= since);
+      const d = oldestDate(records.get(id), adressesFor(id));
+      return Boolean(d && new Date(d) >= since);
     };
     const remaining = tour.ids.filter((id) => !isDone(id));
     return {
@@ -431,23 +435,26 @@ function ProspectionMap({ auth }) {
       remainingFlyers: remaining.reduce((sum, id) => sum + (infoOf(id).value ?? 0), 0),
       focus: { ids: new Set(tour.ids), nextId: remaining[0] ?? null },
     };
-  }, [tour, records, infoOf]);
+  }, [tour, records, infoOf, adressesFor]);
 
-  // Adresse d'un bâtiment : API Adresse (mise en cache), sinon adresse du registre.
+  // Adresse d'un bâtiment : Base Adresse Nationale, sinon API Adresse (mise
+  // en cache), sinon adresse du registre.
   const addressOf = useCallback(
     (id) => {
+      const list = adressesFor(id);
+      if (list.length) return formatAdresses(list, 4);
       if (adresses[id]) return adresses[id];
       const reg = balData?.registre?.[id]?.[3];
       return reg ? reg.charAt(0).toUpperCase() + reg.slice(1) : null;
     },
-    [adresses, balData]
+    [adressesFor, adresses, balData]
   );
 
   // Recherche des adresses de la tournée en arrière-plan (4 à la fois).
   useEffect(() => {
     if (!tour || offline) return;
     let cancelled = false;
-    const todo = tour.ids.filter((id) => !adresses[id] && centers.has(id));
+    const todo = tour.ids.filter((id) => !adresses[id] && !adressesFor(id).length && centers.has(id));
     (async () => {
       for (let i = 0; i < todo.length && !cancelled; i += 4) {
         const batch = todo.slice(i, i + 4);
@@ -463,11 +470,20 @@ function ProspectionMap({ auth }) {
     };
     // Relancé seulement pour une nouvelle tournée ou au retour du réseau.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tour?.createdAt, offline, centers]);
+  }, [tour?.createdAt, offline, centers, adressesData]);
 
   const tourCandidatesFor = useCallback(
-    (p) => tourCandidates({ secteurId: p.secteurId, sectorOf, records, now, days: p.days, includeInaccessible: p.includeInaccessible }),
-    [sectorOf, records, now]
+    (p) =>
+      tourCandidates({
+        secteurId: p.secteurId,
+        sectorOf,
+        records,
+        now,
+        days: p.days,
+        includeInaccessible: p.includeInaccessible,
+        dateOf: (id, r) => oldestDate(r, adressesFor(id)),
+      }),
+    [sectorOf, records, now, adressesFor]
   );
   const planOf = useCallback((ids) => flyersPlan(ids, infoOf), [infoOf]);
 
@@ -526,12 +542,12 @@ function ProspectionMap({ auth }) {
 
   const handleExport = async (what) => {
     if (what === "fiches") {
-      downloadText(`prospection-fiches-${today()}.csv`, fichesCsv(records, types, centers, infoOf));
+      downloadText(`prospection-fiches-${today()}.csv`, fichesCsv(records, types, centers, infoOf, adressesFor));
       return;
     }
     const { data, error } = await fetchPassages();
     if (error) show({ kind: "error", text: `Export impossible. ${NETWORK_HINT}` });
-    else downloadText(`prospection-historique-${today()}.csv`, passagesCsv(data, types));
+    else downloadText(`prospection-historique-${today()}.csv`, passagesCsv(data, types, adressesFor));
   };
 
   const changeMode = (next) => {
@@ -570,6 +586,7 @@ function ProspectionMap({ auth }) {
             buildings={buildings}
             records={records}
             sectorOf={sectorOf}
+            adressesData={adressesData}
             filters={filters}
             focus={tourInfo?.focus}
             now={now}
@@ -642,6 +659,7 @@ function ProspectionMap({ auth }) {
           selectedType={selectedType}
           sectorName={secteurs.find((s) => s.id === sectorOf.get(sheet.building.id))?.nom}
           balData={balData}
+          adresses={adressesFor(sheet.building.id)}
           moi={moi}
           pendingPassages={pending
             .filter((op) => op.type === "passage" && op.payload.id_batiment === sheet.building.id)

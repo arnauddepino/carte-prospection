@@ -8,7 +8,7 @@ Mise en ligne : chaque push sur la branche main de GitHub est publié
 automatiquement par Vercel (https://carte-prospection.vercel.app).
 
 
-ÉTAPE 1 — SÉCURITÉ ............................. PRÊTE, À METTRE EN LIGNE
+ÉTAPE 1 — SÉCURITÉ ............................................... EN LIGNE
 --------------------------------------------------------------------------
   [x] Connexion invisible pour les utilisateurs (identité anonyme Supabase
       par téléphone, seul le prénom est demandé, comme avant)
@@ -22,7 +22,11 @@ automatiquement par Vercel (https://carte-prospection.vercel.app).
   [x] Tests : 29 vérifications des règles sur la copie de la base, 30 de bout
       en bout (dont tentatives de contournement par l'API), toutes les
       autres suites sans régression
-  [!] Mise en ligne en 7 étapes (voir la conversation / README)
+  [x] En ligne (commit d470907) ; migrations 07 et 08 appliquées ; compte
+      administrateur actif ; accès sans connexion refusé (vérifié)
+  [x] Migration 09 appliquée (fonctions internes non appelables par l'API)
+  [ ] Option : activer la protection contre les mots de passe divulgués
+      (Supabase → Authentication → Policies, offre payante)
   [ ] Option : code d'équipe à la première ouverture, pour que seules les
       personnes qui le connaissent puissent lire les données
   [!] Mettre à jour Postgres depuis le tableau de bord Supabase
@@ -81,7 +85,7 @@ automatiquement par Vercel (https://carte-prospection.vercel.app).
       inaccessibles, logements sociaux
   [x] Export CSV pour Excel : fiches et historique complet
   [x] Chargement par pages (Supabase limite chaque requête à 1000 lignes)
-  [~] Adresses : affichées dans la fiche ; reste à les inclure dans l'export
+  [x] Adresses : affichées dans la fiche et incluses dans l'export
   [x] Tests : 35 tests unitaires, 20 vérifications de la migration sur une
       copie locale de la base, 31 vérifications de bout en bout
   [x] Migration 03 appliquée (711 fiches -> 711 passages repris) et mise en
@@ -113,7 +117,7 @@ automatiquement par Vercel (https://carte-prospection.vercel.app).
       étapes 4 et hors ligne sans régression
   [x] Migration 06 appliquée ; 5 secteurs dessinés par l'équipe (Nord Est,
       Nord Ouest, Agence, Sud Ouest, Sud Est), aucune rue en commun
-  [x] Préparer une tournée — PRÊT, À METTRE EN LIGNE (aucune migration) :
+  [x] Préparer une tournée — EN LIGNE (commit 4e0e1f3) :
       secteur, flyer, délai (15/30/60/90 j), inaccessibles ; flyers à
       prévoir par provenance + 10 % de marge ; ordre de passage le plus
       court à pied dans les rues (plus proche voisin + 2-opt), depuis ma
@@ -139,7 +143,20 @@ automatiquement par Vercel (https://carte-prospection.vercel.app).
       Estimation) ; script scripts/donnees-bal.py pour mettre à jour
   [ ] Retour sur investissement : relier les contacts reçus aux campagnes
   [ ] Couvrir d'autres arrondissements
-  [ ] Redécouper un bâtiment fusionné par OpenStreetMap
+  [x] Bâtiments à plusieurs adresses — PRÊT, À METTRE EN LIGNE (migration 10
+      d'abord) : choix = une entrée par adresse plutôt qu'un redécoupage.
+      Adresses officielles (Base Adresse Nationale) rattachées à chaque
+      bâtiment par sa parcelle cadastrale : 5 690 bâtiments, dont 2 496 en
+      ont plusieurs ; titre de la fiche = vraies adresses ; un tap couvre
+      tout le bloc ; en mode Éditer, on coche les adresses faites ; date de
+      chaque adresse dans la fiche ; bloc fait en partie hachuré sur la
+      carte (légende) ; tournées : un bloc reste à faire tant qu'une de ses
+      adresses l'est ; export : colonne Adresses (fiches) et adresses
+      couvertes (historique) ; script scripts/donnees-adresses.py
+      Tests : 96 tests unitaires ; migration 10 sur la copie des vraies
+      fiches (9 vérifications, base et téléphone donnent le même résultat) ;
+      15 vérifications de bout en bout ; sécurité et tournées sans régression
+  [!] Exécuter la migration 10, PUIS pousser la nouvelle version
 
 
 JOURNAL
@@ -173,3 +190,9 @@ JOURNAL
 2026-10-08  Sécurité réalisée (choix : connexion invisible + admin par mot de
             passe ; fiche modifiable par l'auteur du dernier passage ; types
             créables par tous). Migrations 07 et 08 prêtes.
+2026-10-08  Sécurité en ligne (commit d470907), migrations 07 et 08
+            appliquées, accès sans connexion refusé sur les 4 tables.
+2026-10-08  Migration 09 appliquée (vérifié).
+2026-10-08  Bâtiments à plusieurs adresses réalisés (choix : une entrée par
+            adresse, cochée dans la fiche ; hachures si fait en partie).
+            Migration 10 prête.

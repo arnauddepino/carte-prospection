@@ -1,3 +1,4 @@
+import { formatAdresses } from "./adresses";
 import { BAL_SOURCES } from "./bal";
 import { accesLabel } from "./prospections";
 
@@ -15,12 +16,20 @@ function toCsv(columns, rows) {
 const dateFr = (iso) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : "");
 
 // infoOf(id) → { value, source } : boîtes aux lettres retenues et provenance.
-export function fichesCsv(records, types, centers = new Map(), infoOf = (id) => ({ value: records.get(id)?.bal ?? null, source: records.get(id)?.bal != null ? "saisie" : null })) {
+// adressesFor(id) → adresses du bâtiment (lib/adresses).
+export function fichesCsv(
+  records,
+  types,
+  centers = new Map(),
+  infoOf = (id) => ({ value: records.get(id)?.bal ?? null, source: records.get(id)?.bal != null ? "saisie" : null }),
+  adressesFor = () => []
+) {
   const typeName = (id) => types.find((t) => t.id === id)?.name ?? "";
   const rows = [...records.values()].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
   return toCsv(
     [
       { label: "Bâtiment", value: (r) => r.id_batiment },
+      { label: "Adresses", value: (r) => formatAdresses(adressesFor(r.id_batiment)) },
       { label: "Dernier passage", value: (r) => dateFr(r.date) },
       { label: "Type", value: (r) => typeName(r.prospection_type_id) },
       { label: "Par", value: (r) => r.dernier_auteur },
@@ -37,12 +46,19 @@ export function fichesCsv(records, types, centers = new Map(), infoOf = (id) => 
   );
 }
 
-export function passagesCsv(passages, types) {
+// Adresses couvertes : celles cochées pour un passage partiel, sinon toutes.
+export function passagesCsv(passages, types, adressesFor = () => []) {
   const typeName = (id) => types.find((t) => t.id === id)?.name ?? "";
+  const couvertes = (p) => {
+    const list = adressesFor(p.id_batiment);
+    return formatAdresses(p.adresses?.length ? list.filter((a) => p.adresses.includes(a.id)) : list);
+  };
   return toCsv(
     [
       { label: "Date", value: (p) => dateFr(p.date) },
       { label: "Bâtiment", value: (p) => p.id_batiment },
+      { label: "Adresses couvertes", value: couvertes },
+      { label: "Partiel", value: (p) => (p.adresses?.length ? "oui" : "") },
       { label: "Type", value: (p) => typeName(p.prospection_type_id) },
       { label: "Par", value: (p) => p.auteur },
     ],

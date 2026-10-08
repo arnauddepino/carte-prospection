@@ -4,14 +4,25 @@ const DAY = 864e5;
 
 // Bâtiments d'un secteur à faire : sans passage depuis `days` jours (ou jamais
 // prospectés), inaccessibles exclus sauf demande.
-export function tourCandidates({ secteurId, sectorOf, records, now = new Date(), days = 30, includeInaccessible = false }) {
+// dateOf(id, record) : date à comparer au délai (par défaut le dernier passage ;
+// l'appli donne celle de l'adresse la moins récemment faite).
+export function tourCandidates({
+  secteurId,
+  sectorOf,
+  records,
+  now = new Date(),
+  days = 30,
+  includeInaccessible = false,
+  dateOf = (id, r) => r?.date,
+}) {
   const limit = now - days * DAY;
   const ids = [];
   for (const [id, s] of sectorOf) {
     if (s !== secteurId) continue;
     const r = records.get(id);
     if (!includeInaccessible && r?.acces === "inaccessible") continue;
-    if (r?.date && new Date(r.date) >= limit) continue;
+    const date = dateOf(id, r);
+    if (date && new Date(date) >= limit) continue;
     ids.push(id);
   }
   return ids;

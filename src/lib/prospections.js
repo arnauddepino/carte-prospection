@@ -52,24 +52,44 @@ export function formToPayload(form) {
 }
 
 // Nouveau passage. Sans date (tap), c'est maintenant ; une date choisie dans
-// la fiche est placée à midi pour rester sur le bon jour.
-export function passagePayload({ id_batiment, date, typeId, auteur }) {
+// la fiche est placée à midi pour rester sur le bon jour. adresses : les
+// adresses couvertes (identifiants BAN) quand le passage ne couvre qu'une
+// partie du bâtiment ; absent = tout le bâtiment.
+export function passagePayload({ id_batiment, date, typeId, auteur, adresses }) {
   return {
     client_id: crypto.randomUUID(), // identifiant stable, même hors ligne (évite les doublons au renvoi)
     id_batiment,
     date: date ? fromDateInputValue(date) : new Date().toISOString(),
     prospection_type_id: typeId,
     auteur: toText(auteur),
+    ...(adresses?.length ? { adresses } : {}),
   };
 }
 
-// La fiche après un passage, comme le calcule la base : seul un passage plus
-// récent que le dernier connu la met à jour.
+const after = (a, b) => new Date(a) > new Date(b);
+
+// La fiche après un passage, comme le calcule la base (déclencheur
+// sync_dernier_passage) : le résumé du dernier passage ne change que pour un
+// passage plus récent ; date_complet = dernier passage sur tout le bâtiment ;
+// adresses = { idBan: date } des passages partiels postérieurs.
 export function applyPassage(record, passage) {
-  if (record?.date && new Date(record.date) > new Date(passage.date)) return record;
+  const complet = (record && "date_complet" in record ? record.date_complet : record?.date) ?? null;
+  let date_complet = complet;
+  let adresses = record?.adresses ?? null;
+  if (!passage.adresses?.length) {
+    if (!complet || !after(complet, passage.date)) {
+      date_complet = passage.date;
+      const kept = Object.entries(adresses ?? {}).filter(([, d]) => after(d, passage.date));
+      adresses = kept.length ? Object.fromEntries(kept) : null;
+    }
+  } else if (!complet || after(passage.date, complet)) {
+    adresses = { ...adresses };
+    for (const a of passage.adresses) if (!adresses[a] || after(passage.date, adresses[a])) adresses[a] = passage.date;
+  }
+  const base = { ...record, id_batiment: passage.id_batiment, date_complet, adresses };
+  if (record?.date && after(record.date, passage.date)) return base;
   return {
-    ...record,
-    id_batiment: passage.id_batiment,
+    ...base,
     date: passage.date,
     prospection_type_id: passage.prospection_type_id,
     dernier_auteur: passage.auteur,

@@ -106,7 +106,7 @@ describe("passages", () => {
     const recent = applyPassage(record, { id_batiment: "way/1", date: "2026-10-01T10:00:00Z", prospection_type_id: 2, auteur: "Léa" });
     expect(recent).toMatchObject({ prospection_type_id: 2, dernier_auteur: "Léa", code_entree: "A1" });
     const ancien = applyPassage(record, { id_batiment: "way/1", date: "2025-01-01T10:00:00Z", prospection_type_id: 3 });
-    expect(ancien).toBe(record);
+    expect(ancien).toMatchObject({ date: record.date, prospection_type_id: 1, date_complet: record.date });
     expect(applyPassage(undefined, { id_batiment: "way/2", date: "2026-10-01T10:00:00Z", prospection_type_id: 1 }).id_batiment).toBe("way/2");
   });
 });
@@ -160,5 +160,23 @@ describe("export CSV", () => {
   test("historique : une ligne par passage", () => {
     const csv = passagesCsv([{ date: "2026-10-01T10:00:00Z", id_batiment: "way/1", prospection_type_id: 1, auteur: "Léa" }], types);
     expect(csv.slice(1).split("\r\n")).toHaveLength(2);
+  });
+
+  test("adresses : toutes pour la fiche, celles cochées pour un passage partiel", () => {
+    const list = [
+      { id: "a12", numero: "12", rue: "Rue Leblanc" },
+      { id: "a14", numero: "14", rue: "Rue Leblanc" },
+    ];
+    const records = new Map([["way/1", { id_batiment: "way/1", date: "2026-10-01T10:00:00Z", prospection_type_id: 1 }]]);
+    const fiches = fichesCsv(records, types, new Map(), undefined, () => list).slice(1).split("\r\n");
+    expect(fiches[0].split(";")[1]).toBe("Adresses");
+    expect(fiches[1]).toContain("way/1;12, 14 Rue Leblanc;");
+    const passages = [
+      { date: "2026-10-01T10:00:00Z", id_batiment: "way/1", prospection_type_id: 1, adresses: ["a14"] },
+      { date: "2026-09-01T10:00:00Z", id_batiment: "way/1", prospection_type_id: 1 },
+    ];
+    const lines = passagesCsv(passages, types, () => list).slice(1).split("\r\n");
+    expect(lines[1]).toContain("way/1;14 Rue Leblanc;oui;Flyer A");
+    expect(lines[2]).toContain("way/1;12, 14 Rue Leblanc;;Flyer A");
   });
 });
