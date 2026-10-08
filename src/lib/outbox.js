@@ -11,7 +11,8 @@ import { applyPassage } from "./prospections";
 
 const newId = () => crypto.randomUUID();
 
-export const passageOp = (payload) => ({ type: "passage", id: newId(), payload });
+// uid : auteur du passage (posé par la base à l'envoi, connu ici pour l'affichage).
+export const passageOp = (payload, uid = null) => ({ type: "passage", id: newId(), payload, uid });
 export const ficheOp = (payload) => ({ type: "fiche", id: newId(), payload });
 export const removeFicheOp = (id_batiment) => ({ type: "removeFiche", id: newId(), id_batiment });
 
@@ -20,7 +21,7 @@ export function applyOp(records, op) {
   const next = new Map(records);
   if (op.type === "passage") {
     const p = op.payload;
-    next.set(p.id_batiment, applyPassage(records.get(p.id_batiment), p));
+    next.set(p.id_batiment, applyPassage(records.get(p.id_batiment), { ...p, auteur_id: op.uid }));
   } else if (op.type === "deletePassage") {
     if (op.previous) next.set(op.id_batiment, op.previous);
     else next.delete(op.id_batiment);
@@ -59,7 +60,9 @@ export function enqueueUndo(queue, payload, previous) {
 
 // Échec à retenter plus tard (réseau absent, serveur indisponible) ou erreur
 // définitive (donnée refusée) ?
+// 401 : jeton de connexion expiré (après une longue période hors ligne) ; il
+// est rafraîchi automatiquement, la modification repartira au prochain essai.
 export function isRetryable(error, status) {
-  if (status === 0 || status === 408 || status === 429 || status >= 500) return true;
+  if (status === 0 || status === 401 || status === 408 || status === 429 || status >= 500) return true;
   return /fetch|network|timeout|abort|load failed/i.test(error?.message ?? "");
 }

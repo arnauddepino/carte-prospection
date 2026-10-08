@@ -24,6 +24,7 @@ export default function SettingsSheet({
   onCreateType,
   onExport,
   auteur,
+  isAdmin = false,
   onChangeAuteur,
   onClose,
 }) {
@@ -158,7 +159,10 @@ export default function SettingsSheet({
 
         <h3>Vous</h3>
         <div className="field-inline identity-row">
-          <span>{auteur}</span>
+          <span>
+            {auteur}
+            <span className="role-label">{isAdmin ? "Administrateur" : "Utilisateur"}</span>
+          </span>
           <button type="button" className="button secondary" onClick={onChangeAuteur}>
             Changer de prénom
           </button>

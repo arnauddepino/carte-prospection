@@ -11,6 +11,8 @@ import { useLocate } from "./hooks/useLocate";
 import { loadStreets, useSecteurs } from "./hooks/useSecteurs";
 import { useSectorDraft } from "./hooks/useSectorDraft";
 import { useBalData } from "./hooks/useBalData";
+import { useAuth } from "./hooks/useAuth";
+import { canEditSectors } from "./lib/droits";
 import { balInfo, flyersPlan } from "./lib/bal";
 import { planTour, tourCandidates } from "./lib/tournee";
 import { reverseAddress } from "./lib/adresse";
@@ -53,7 +55,24 @@ export default function App() {
       </div>
     );
   }
-  return <ProspectionMap />;
+  return <Connexion />;
+}
+
+// Connexion (anonyme et automatique, ou administrateur) avant de charger les données.
+function Connexion() {
+  const auth = useAuth();
+  if (!auth.ready) return <div className="status-banner">Connexion…</div>;
+  if (!auth.uid && auth.error) {
+    return (
+      <div className="status-banner error">
+        Connexion impossible{navigator.onLine ? " (connexion anonyme désactivée dans Supabase ?)" : " : réseau indisponible"}.
+        <button className="button secondary" onClick={auth.retry}>
+          Réessayer
+        </button>
+      </div>
+    );
+  }
+  return <ProspectionMap auth={auth} />;
 }
 
 // Fait remonter le bâtiment touché dans la partie visible au-dessus de la fiche.
@@ -87,7 +106,8 @@ function MapClicks({ onClick }) {
   return null;
 }
 
-function ProspectionMap() {
+function ProspectionMap({ auth }) {
+  const moi = useMemo(() => ({ uid: auth.uid, isAdmin: auth.isAdmin }), [auth.uid, auth.isAdmin]);
   const [map, setMap] = useState(null);
   const [buildings, setBuildings] = useState(null);
   const [buildingsError, setBuildingsError] = useState(false);
@@ -107,6 +127,7 @@ function ProspectionMap() {
     deletePassage,
   } = useProspections({
     onFatal: () => show({ kind: "error", text: "Une modification a été refusée par le serveur et annulée." }),
+    uid: auth.uid,
   });
   const { types, create: createType } = useProspectTypes();
   const [mode, setMode] = useStoredState("prospection.mode", "prospect");
@@ -561,7 +582,7 @@ function ProspectionMap() {
         {((sectorsVisible && !tour) || draft.active || SECTOR_SHEETS.includes(sheet?.kind)) && (
           <SectorsLayer
             secteurs={secteurs}
-            interactive={SECTOR_SHEETS.includes(sheet?.kind)}
+            interactive={canEditSectors(moi) && SECTOR_SHEETS.includes(sheet?.kind)}
             onLegTap={handleLegTap}
             draft={draft.view(graph)}
           />
@@ -621,6 +642,7 @@ function ProspectionMap() {
           selectedType={selectedType}
           sectorName={secteurs.find((s) => s.id === sectorOf.get(sheet.building.id))?.nom}
           balData={balData}
+          moi={moi}
           pendingPassages={pending
             .filter((op) => op.type === "passage" && op.payload.id_batiment === sheet.building.id)
             .map((op) => op.payload)}
@@ -641,6 +663,7 @@ function ProspectionMap() {
           onCreateType={handleCreateType}
           onExport={handleExport}
           auteur={auteur}
+          isAdmin={auth.isAdmin}
           onChangeAuteur={() => setEditingAuteur(true)}
           onClose={() => setSheet(null)}
         />
@@ -653,6 +676,8 @@ function ProspectionMap() {
           visible={sectorsVisible}
           onToggleVisible={setSectorsVisible}
           onDraw={() => startDrawing()}
+          canEdit={canEditSectors(moi)}
+          onZoom={zoomToSector}
           onTour={() => setSheet({ kind: "tour-setup" })}
           onEdit={(sector) => setSheet({ kind: "sector", sector })}
           onClose={() => setSheet(null)}
@@ -794,6 +819,9 @@ function ProspectionMap() {
       {(!auteur || editingAuteur) && (
         <IdentitySheet
           current={auteur}
+          isAdmin={auth.isAdmin}
+          onSignInAdmin={auth.signInAdmin}
+          onBecomeUser={auth.becomeUser}
           onSave={(name) => {
             setAuteur(name);
             setEditingAuteur(false);

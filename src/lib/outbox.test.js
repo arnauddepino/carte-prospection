@@ -56,6 +56,8 @@ describe("isRetryable", () => {
     [{ message: "Service Unavailable" }, 503, true],
     [{ message: "timeout" }, 408, true],
     [{ message: "AbortError: signal is aborted without reason" }, 0, true],
+    [{ message: "JWT expired" }, 401, true],
+    [{ message: "new row violates row-level security policy" }, 403, false],
     [{ message: "violates foreign key constraint" }, 409, false],
     [{ message: "new row violates check constraint" }, 400, false],
   ])("%o (HTTP %i) → %s", (error, status, attendu) => {

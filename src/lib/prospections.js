@@ -73,6 +73,7 @@ export function applyPassage(record, passage) {
     date: passage.date,
     prospection_type_id: passage.prospection_type_id,
     dernier_auteur: passage.auteur,
+    dernier_auteur_id: passage.auteur_id ?? null,
   };
 }
 

@@ -29,7 +29,7 @@ async function fetchAll(buildQuery) {
 //     le réseau le permet ;
 //   • les changements des collègues arrivent en temps réel.
 // onFatal(op, error) signale une modification refusée par le serveur.
-export function useProspections({ onFatal } = {}) {
+export function useProspections({ onFatal, uid } = {}) {
   const cached = useMemo(() => readJson(CACHE_KEY, null), []);
   const [server, setServer] = useState(() => indexByBuilding(cached?.rows ?? []));
   const [queue, setQueue] = useState(() => readJson(QUEUE_KEY, []));
@@ -43,6 +43,8 @@ export function useProspections({ onFatal } = {}) {
   const flushingRef = useRef(false);
   const onFatalRef = useRef(onFatal);
   onFatalRef.current = onFatal;
+  const uidRef = useRef(uid);
+  uidRef.current = uid;
 
   const updateServer = useCallback((updater) => {
     serverRef.current = updater(serverRef.current);
@@ -121,7 +123,10 @@ export function useProspections({ onFatal } = {}) {
         setOffline(false);
         // Le serveur reflète maintenant l'opération.
         if (op.type === "passage") {
-          setServerRow(op.payload.id_batiment, applyPassage(serverRef.current.get(op.payload.id_batiment), op.payload));
+          setServerRow(
+            op.payload.id_batiment,
+            applyPassage(serverRef.current.get(op.payload.id_batiment), { ...op.payload, auteur_id: op.uid })
+          );
         } else if (op.type === "fiche" && result.data?.[0]) {
           setServerRow(op.payload.id_batiment, result.data[0]);
         } else if (op.type === "removeFiche") {
@@ -204,7 +209,7 @@ export function useProspections({ onFatal } = {}) {
   const addPassage = useCallback(
     (payload) => {
       const previous = recordsRef.current.get(payload.id_batiment);
-      push(passageOp(payload));
+      push(passageOp(payload, uidRef.current));
       return { payload, previous };
     },
     [push]
@@ -221,14 +226,17 @@ export function useProspections({ onFatal } = {}) {
   const saveFiche = useCallback((payload) => push(ficheOp(payload)), [push]);
   const removeFiche = useCallback((id_batiment) => push(removeFicheOp(id_batiment)), [push]);
 
-  // Suppression d'un passage depuis l'historique : nécessite le réseau.
+  // Suppression d'un passage depuis l'historique : nécessite le réseau. La
+  // base ne supprime que ses propres passages (ou tout, pour l'admin) : un
+  // refus se traduit par « aucune ligne supprimée ».
   const deletePassage = useCallback(
     async (passage) => {
-      const { error } = await supabase.from("passages").delete().eq("client_id", passage.client_id);
+      const { data, error } = await supabase.from("passages").delete().eq("client_id", passage.client_id).select("id");
       if (error) {
         console.error("Suppression passage :", error);
         return { error };
       }
+      if (!data?.length) return { error: { message: "Seul l’auteur du passage ou l’administrateur peut le supprimer." } };
       await refresh(passage.id_batiment);
       return { error: null };
     },

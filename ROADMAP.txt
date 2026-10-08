@@ -8,16 +8,24 @@ Mise en ligne : chaque push sur la branche main de GitHub est publié
 automatiquement par Vercel (https://carte-prospection.vercel.app).
 
 
-ÉTAPE 1 — SÉCURITÉ ............................................ REPORTÉE
+ÉTAPE 1 — SÉCURITÉ ............................. PRÊTE, À METTRE EN LIGNE
 --------------------------------------------------------------------------
-Aujourd'hui, toute personne qui connaît l'adresse du site peut lire,
-modifier et supprimer les données, y compris les codes d'entrée.
-
-  [ ] Connexion des utilisateurs (lien de connexion par e-mail, Supabase Auth)
-  [ ] Règles d'accès Supabase (RLS) réservées aux utilisateurs connectés
-  [ ] Nettoyer les règles d'accès en double (signalées par Supabase)
+  [x] Connexion invisible pour les utilisateurs (identité anonyme Supabase
+      par téléphone, seul le prénom est demandé, comme avant)
+  [x] Accès administrateur : prénom « Arnaud » → choix Utilisateur /
+      Administrateur → mot de passe
+  [x] Règles appliquées par la base (RLS + droits par colonne) :
+      passages à son nom, annulation de ses propres passages ; fiche
+      modifiable par l'auteur du dernier passage ou l'admin ; secteurs et
+      suppression de fiche réservés à l'admin ; types créables par tous
+  [x] Plus aucun accès sans connexion (migration 08)
+  [x] Tests : 29 vérifications des règles sur la copie de la base, 30 de bout
+      en bout (dont tentatives de contournement par l'API), toutes les
+      autres suites sans régression
+  [!] Mise en ligne en 7 étapes (voir la conversation / README)
+  [ ] Option : code d'équipe à la première ouverture, pour que seules les
+      personnes qui le connaissent puissent lire les données
   [!] Mettre à jour Postgres depuis le tableau de bord Supabase
-      (correctifs de sécurité en attente, coupure de quelques minutes)
 
 
 ÉTAPE 2 — FONDATIONS ........................................... TERMINÉE
@@ -162,3 +170,6 @@ JOURNAL
             registre des copropriétés + saisie + estimation signalée ; ordre
             de passage = distance à pied minimale ; tournée gardée sur le
             téléphone).
+2026-10-08  Sécurité réalisée (choix : connexion invisible + admin par mot de
+            passe ; fiche modifiable par l'auteur du dernier passage ; types
+            créables par tous). Migrations 07 et 08 prêtes.

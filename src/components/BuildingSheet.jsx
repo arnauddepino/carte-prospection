@@ -4,6 +4,7 @@ import { reverseAddress } from "../lib/adresse";
 import { relativeDay, toDateInputValue } from "../lib/dates";
 import { ACCES, recordToForm } from "../lib/prospections";
 import { balInfo } from "../lib/bal";
+import { canDeleteFiche, canDeletePassage, canEditFiche } from "../lib/droits";
 import Icon from "./Icon";
 
 const osmLabel = (p = {}) =>
@@ -22,6 +23,7 @@ export default function BuildingSheet({
   sectorName,
   balData,
   pendingPassages = [],
+  moi = { uid: null, isAdmin: false },
   onSaveFiche,
   onAddPassage,
   onDeletePassage,
@@ -41,6 +43,7 @@ export default function BuildingSheet({
 
   const typeName = (id) => types.find((t) => t.id === id)?.name;
   const reference = balInfo(building.id, null, balData); // registre ou estimation, hors saisie
+  const editable = canEditFiche(record, moi);
 
   // Adresse la plus proche de l'endroit touché.
   useEffect(() => {
@@ -107,6 +110,13 @@ export default function BuildingSheet({
             run(() => onSaveFiche(form));
           }}
         >
+          {!editable && (
+            <p className="hint lock-hint">
+              Fiche modifiable par {record?.dernier_auteur ?? "l’auteur du dernier passage"} (dernier passage) ou par
+              l’administrateur. Prospectez ce bâtiment pour pouvoir la compléter.
+            </p>
+          )}
+          <fieldset className="plain" disabled={!editable}>
           <div className="field">
             <span className="field-label" id="acces-label">Accès</span>
             <div className="chips" role="group" aria-labelledby="acces-label">
@@ -165,9 +175,12 @@ export default function BuildingSheet({
             <textarea id="f-infos" rows="2" {...field("infos")} />
           </div>
 
-          <button type="submit" className="button primary" disabled={busy}>
-            Enregistrer la fiche
-          </button>
+          {editable && (
+            <button type="submit" className="button primary" disabled={busy}>
+              Enregistrer la fiche
+            </button>
+          )}
+          </fieldset>
         </form>
 
         {/* ─── Passages ─── */}
@@ -245,7 +258,7 @@ export default function BuildingSheet({
                         .join(" · ")}
                     </span>
                   </div>
-                  {confirm === p.id ? (
+                  {!canDeletePassage(p, moi) ? null : confirm === p.id ? (
                     <button
                       className="button danger small"
                       disabled={busy}
@@ -273,6 +286,7 @@ export default function BuildingSheet({
         </section>
 
         {record &&
+          canDeleteFiche(moi) &&
           (confirm === "fiche" ? (
             <button type="button" className="button danger" disabled={busy} onClick={() => run(onDeleteFiche)}>
               Confirmer : supprimer la fiche et tout l’historique

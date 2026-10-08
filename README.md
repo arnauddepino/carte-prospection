@@ -14,8 +14,12 @@ localisation, légende et filtres. Recherche d'adresse en haut.
   interphone, inaccessible), code d'entrée, BAL, logement social, infos, et l'historique
   des passages (ajout d'un passage daté, suppression). Le clic droit / appui long ouvre
   aussi la fiche dans les deux modes.
-- **Prénom** : demandé à la première ouverture et enregistré avec chaque passage
-  (ce n'est pas une connexion sécurisée).
+- **Prénom et connexion** : seul le prénom est demandé ; chaque téléphone reçoit en arrière-plan
+  une identité anonyme sécurisée (Supabase). Avec le prénom « Arnaud », l'appli propose
+  « Utilisateur » ou « Administrateur » (mot de passe).
+- **Droits** (appliqués par la base) : chacun prospecte et annule ses propres passages ; la fiche
+  d'un bâtiment est modifiable par l'auteur du dernier passage ou l'administrateur ; secteurs et
+  suppression de fiche réservés à l'administrateur ; tout le monde peut créer un type.
 - **Légende et filtres** : filtres par type, collègue, ancienneté, code connu,
   inaccessibles, logements sociaux ; export CSV (fiches et historique) pour Excel.
 - **Temps réel** : les passages des collègues apparaissent sans recharger la page.
@@ -47,7 +51,7 @@ localisation, légende et filtres. Recherche d'adresse en haut.
 ## Développement
 
 ```bash
-cp .env.example .env.local   # puis renseigner l'URL et la clé anon Supabase
+cp .env.example .env.local   # puis renseigner l'URL, la clé anon Supabase et l'e-mail admin
 npm install
 npm run dev                  # http://localhost:3000
 npm test                     # tests unitaires (src/lib)

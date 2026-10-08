@@ -17,7 +17,9 @@ function SheetHeader({ title, subtitle, onClose }) {
 }
 
 // Liste des secteurs avec leur avancement.
-export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw, onEdit, onTour, onClose }) {
+// canEdit : l'administrateur dessine et modifie ; les autres consultent
+// (toucher un secteur le montre sur la carte) et préparent leurs tournées.
+export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw, onEdit, onZoom, onTour, canEdit, onClose }) {
   return (
     <section className="sheet compact" aria-label="Secteurs">
       <SheetHeader
@@ -27,14 +29,18 @@ export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw
       />
       <div className="sheet-body">
         {secteurs.length === 0 ? (
-          <p className="hint">Aucun secteur. Dessinez le premier en touchant les carrefours des rues à couvrir.</p>
+          <p className="hint">
+            {canEdit
+              ? "Aucun secteur. Dessinez le premier en touchant les carrefours des rues à couvrir."
+              : "Aucun secteur pour l’instant : ils sont dessinés par l’administrateur."}
+          </p>
         ) : (
           <ul className="sectors">
             {secteurs.map((s) => {
               const st = stats.get(s.id) ?? { total: 0, aJour: 0, pct: 0, bal: 0, balConnus: 0 };
               return (
                 <li key={s.id}>
-                  <button type="button" onClick={() => onEdit(s)}>
+                  <button type="button" onClick={() => (canEdit ? onEdit(s) : onZoom(s))}>
                     <span className="sector-swatch" style={{ background: s.couleur }} aria-hidden="true" />
                     <span className="sector-main">
                       <strong>{s.nom}</strong>
@@ -56,17 +62,20 @@ export function SectorsSheet({ secteurs, stats, visible, onToggleVisible, onDraw
           </ul>
         )}
         <p className="hint">
-          Pour choisir les côtés de rue couverts ou supprimer un tronçon, touchez une ligne sur la carte pendant que
-          ce panneau est ouvert.
+          {canEdit
+            ? "Pour choisir les côtés de rue couverts ou supprimer un tronçon, touchez une ligne sur la carte pendant que ce panneau est ouvert."
+            : "Touchez un secteur pour le voir sur la carte. Les secteurs sont gérés par l’administrateur."}
         </p>
         <label className="checkbox">
           <input type="checkbox" checked={visible} onChange={(e) => onToggleVisible(e.target.checked)} />
           Afficher les secteurs sur la carte
         </label>
         <div className="field-inline">
-          <button type="button" className="button secondary grow" onClick={onDraw}>
-            Dessiner un secteur
-          </button>
+          {canEdit && (
+            <button type="button" className="button secondary grow" onClick={onDraw}>
+              Dessiner un secteur
+            </button>
+          )}
           {secteurs.length > 0 && (
             <button type="button" className="button primary grow" onClick={onTour}>
               Préparer une tournée
