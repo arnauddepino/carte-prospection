@@ -5,7 +5,8 @@ const DAY = 864e5;
 // Bâtiments d'un secteur à faire : sans passage depuis `days` jours (ou jamais
 // prospectés), inaccessibles exclus sauf demande.
 // dateOf(id, record) : date à comparer au délai (par défaut le dernier passage ;
-// l'appli donne celle de l'adresse la moins récemment faite).
+// l'appli donne celle de l'adresse la moins récemment faite). isTarget(id) :
+// bâtiment ciblé (l'appli écarte les logements sociaux).
 export function tourCandidates({
   secteurId,
   sectorOf,
@@ -14,11 +15,12 @@ export function tourCandidates({
   days = 30,
   includeInaccessible = false,
   dateOf = (id, r) => r?.date,
+  isTarget = () => true,
 }) {
   const limit = now - days * DAY;
   const ids = [];
   for (const [id, s] of sectorOf) {
-    if (s !== secteurId) continue;
+    if (s !== secteurId || !isTarget(id)) continue;
     const r = records.get(id);
     if (!includeInaccessible && r?.acces === "inaccessible") continue;
     const date = dateOf(id, r);

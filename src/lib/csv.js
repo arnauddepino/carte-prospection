@@ -1,5 +1,6 @@
 import { formatAdresses } from "./adresses";
 import { BAL_SOURCES } from "./bal";
+import { SOCIAL_SOURCES } from "./social";
 import { accesLabel } from "./prospections";
 
 // CSV pour Excel en français : séparateur « ; », BOM UTF-8 pour les accents.
@@ -15,14 +16,20 @@ function toCsv(columns, rows) {
 
 const dateFr = (iso) => (iso ? new Date(iso).toLocaleDateString("fr-FR") : "");
 
-// infoOf(id) → { value, source } : boîtes aux lettres retenues et provenance.
-// adressesFor(id) → adresses du bâtiment (lib/adresses).
+// Options :
+//   • centers : Map id → [lat, lng] ;
+//   • infoOf(id) → { value, source } : boîtes aux lettres retenues et provenance ;
+//   • adressesFor(id) → adresses du bâtiment (lib/adresses) ;
+//   • socialOf(id, fiche) → { social, source } (lib/social).
 export function fichesCsv(
   records,
   types,
-  centers = new Map(),
-  infoOf = (id) => ({ value: records.get(id)?.bal ?? null, source: records.get(id)?.bal != null ? "saisie" : null }),
-  adressesFor = () => []
+  {
+    centers = new Map(),
+    infoOf = (id) => ({ value: records.get(id)?.bal ?? null, source: records.get(id)?.bal != null ? "saisie" : null }),
+    adressesFor = () => [],
+    socialOf = (id, r) => ({ social: Boolean(r.logement_social), source: r.logement_social ? "saisie" : null }),
+  } = {}
 ) {
   const typeName = (id) => types.find((t) => t.id === id)?.name ?? "";
   const rows = [...records.values()].sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""));
@@ -37,7 +44,8 @@ export function fichesCsv(
       { label: "Source BAL", value: (r) => BAL_SOURCES[infoOf(r.id_batiment).source]?.long ?? "" },
       { label: "Accès", value: (r) => accesLabel(r.acces) },
       { label: "Code d'entrée", value: (r) => r.code_entree },
-      { label: "Logement social", value: (r) => (r.logement_social ? "oui" : "") },
+      { label: "Logement social", value: (r) => (socialOf(r.id_batiment, r).social ? "oui" : "") },
+      { label: "Source logement social", value: (r) => SOCIAL_SOURCES[socialOf(r.id_batiment, r).source] ?? "" },
       { label: "Infos", value: (r) => r.infos },
       { label: "Latitude", value: (r) => centers.get(r.id_batiment)?.[0]?.toFixed(6) },
       { label: "Longitude", value: (r) => centers.get(r.id_batiment)?.[1]?.toFixed(6) },

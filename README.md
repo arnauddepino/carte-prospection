@@ -74,6 +74,7 @@ src/
                            tableau de bord (stats), adresses, export CSV
 scripts/donnees-bal.py     met à jour public/bal-15e.json depuis le registre (data.gouv.fr)
 scripts/donnees-adresses.py met à jour public/adresses-15e.json (Base Adresse Nationale + cadastre)
+scripts/donnees-social.py  met à jour public/social-15e.json (répertoire RPLS + Ville de Paris)
 public/sw.js               service worker : appli, bâtiments et tuiles disponibles hors ligne
 supabase/migrations/       historique des modifications de la base
 public/
@@ -82,6 +83,8 @@ public/
                            (généré par scripts/donnees-bal.py)
   adresses-15e.json        adresses de chaque bâtiment, suivies une à une quand
                            un bâtiment en a plusieurs (scripts/donnees-adresses.py)
+  social-15e.json          logements sociaux par bâtiment : immeubles sociaux (hors
+                           cible) et copropriétés mixtes (scripts/donnees-social.py)
   rues-15e.json            plan des rues du 15e (OSM, sans trottoirs ni passages piétons)
                            pour tracer les secteurs en suivant les rues
   zones-jaune.geojson      ancienne zone, non utilisée

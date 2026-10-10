@@ -13,7 +13,20 @@ const BASE_STYLE = styleFor(NEVER_COLOR);
 // focus (tournée en cours) : { ids: Set, nextId } — les autres bâtiments sont
 // estompés et le prochain à faire est cerclé.
 // adressesData : adresses de chaque bâtiment (hachures si fait en partie).
-export default function BuildingsLayer({ buildings, records, sectorOf, adressesData, filters, focus, now, selectedId, onTap, onEdit }) {
+// isSocial(id) : logement social (gris barré).
+export default function BuildingsLayer({
+  buildings,
+  records,
+  sectorOf,
+  adressesData,
+  isSocial = () => false,
+  filters,
+  focus,
+  now,
+  selectedId,
+  onTap,
+  onEdit,
+}) {
   const groupRef = useRef(null);
   const layersRef = useRef(new Map()); // id → { layer, key }
 
@@ -33,21 +46,23 @@ export default function BuildingsLayer({ buildings, records, sectorOf, adressesD
     for (const [id, entry] of layersRef.current) {
       const record = records.get(id);
       const color = colorFor(record?.date, now);
+      const social = isSocial(id);
       const options = {
+        social,
         selected: id === selectedId || id === focus?.nextId,
         inaccessible: record?.acces === "inaccessible",
         partial: record?.date ? partialColor(record, adressesOf(id, adressesData), now) : null,
         hidden:
           (focus && !focus.ids.has(id)) ||
-          (filtering && !matchesFilters(record, filters, now, sectorOf.get(id) ?? null)),
+          (filtering && !matchesFilters(record, filters, now, sectorOf.get(id) ?? null, social)),
       };
-      const key = `${color}|${options.selected}|${options.inaccessible}|${options.hidden}|${options.partial}`;
+      const key = `${color}|${options.selected}|${options.inaccessible}|${options.hidden}|${options.partial}|${social}`;
       if (key !== entry.key) {
         entry.layer.setStyle(styleFor(color, options));
         entry.key = key;
       }
     }
-  }, [buildings, records, sectorOf, adressesData, filters, focus, now, selectedId]);
+  }, [buildings, records, sectorOf, adressesData, isSocial, filters, focus, now, selectedId]);
 
   const eventHandlers = useMemo(() => {
     const building = (e) => ({

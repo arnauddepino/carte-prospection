@@ -49,14 +49,52 @@ export function hatch(color, other) {
   return patterns.get(key);
 }
 
+// Logement social (hors cible) : gris barré de croisillons, quelle que soit
+// la date du dernier passage.
+export const SOCIAL_COLOR = "#6b6b6b";
+const SOCIAL_FOND = "#d4d4d4";
+let crossPattern;
+function cross() {
+  if (crossPattern === undefined) {
+    const canvas = typeof document !== "undefined" ? document.createElement("canvas") : null;
+    const ctx = canvas?.getContext?.("2d");
+    if (!ctx) return SOCIAL_FOND;
+    const s = 8;
+    canvas.width = canvas.height = s;
+    ctx.fillStyle = SOCIAL_FOND;
+    ctx.fillRect(0, 0, s, s);
+    ctx.strokeStyle = SOCIAL_COLOR;
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(s, s);
+    ctx.moveTo(s, 0);
+    ctx.lineTo(0, s);
+    ctx.stroke();
+    crossPattern = ctx.createPattern(canvas, "repeat");
+  }
+  return crossPattern;
+}
+
 // Style Leaflet d'un bâtiment. Les bâtiments jamais prospectés restent
 // discrets pour ne pas noyer la carte ; le bâtiment ouvert est cerclé ;
 // un bâtiment inaccessible a un contour en pointillés ; un bâtiment fait en
 // partie (partial = couleur de son adresse la plus ancienne) est hachuré ;
-// un bâtiment écarté par les filtres n'est plus qu'un léger contour.
-export function styleFor(color, { selected = false, inaccessible = false, hidden = false, partial = null } = {}) {
+// un logement social est gris barré ; un bâtiment écarté par les filtres
+// n'est plus qu'un léger contour.
+export function styleFor(color, { selected = false, inaccessible = false, hidden = false, partial = null, social = false } = {}) {
   if (hidden && !selected) {
     return { color: NEVER_COLOR, weight: 0.5, opacity: 0.4, fillOpacity: 0, dashArray: null };
+  }
+  if (social) {
+    return {
+      color: selected ? "#111111" : SOCIAL_COLOR,
+      weight: selected ? 3 : 1,
+      opacity: 1,
+      dashArray: inaccessible ? "5 4" : null,
+      fillColor: cross(),
+      fillOpacity: 0.75,
+    };
   }
   const never = color === NEVER_COLOR;
   return {

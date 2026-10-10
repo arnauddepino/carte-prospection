@@ -1376,3 +1376,27 @@ fieldset.plain:disabled {
   height: 10px;
   border-radius: 50%;
 }
+
+/* ─── Logements sociaux (hors cible) ─── */
+.sheet-social {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: repeating-linear-gradient(45deg, #6b6b6b33 0 1px, transparent 1px 6px),
+    repeating-linear-gradient(-45deg, #6b6b6b33 0 1px, var(--surface-2) 1px 6px);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+.social-source {
+  margin: -6px 0 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.adresses .badge {
+  margin-left: 2px;
+  padding: 2px 8px;
+}

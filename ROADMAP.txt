@@ -156,7 +156,20 @@ automatiquement par Vercel (https://carte-prospection.vercel.app).
       Tests : 96 tests unitaires ; migration 10 sur la copie des vraies
       fiches (9 vérifications, base et téléphone donnent le même résultat) ;
       15 vérifications de bout en bout ; sécurité et tournées sans régression
-  [!] Exécuter la migration 10, PUIS pousser la nouvelle version
+  [x] Migration 10 appliquée, en ligne (commit 93477f0)
+  [x] Logements sociaux repérés — PRÊT, À METTRE EN LIGNE (migration 11
+      d'abord) : répertoire national des logements sociaux (RPLS, 24 510
+      logements dans le 15e, 93 % rattachés) + acquisitions récentes de la
+      Ville de Paris ; 272 immeubles sociaux gris barrés sur la carte, hors
+      tournées, hors couverture des secteurs et du tableau de bord ; 144
+      copropriétés mixtes toujours ciblées (« Copropriété avec N logements
+      sociaux » dans la fiche, adresses sociales signalées) ; tap normal
+      (choix) ; case de la fiche pour corriger la donnée ; légende, filtre et
+      export ; script scripts/donnees-social.py
+      Tests : 100 tests unitaires ; migration 11 sur la copie des vraies
+      fiches ; 15 vérifications de bout en bout ; adresses, sécurité et
+      tournées sans régression
+  [!] Exécuter la migration 11, PUIS pousser la nouvelle version
 
 
 JOURNAL
@@ -196,3 +209,6 @@ JOURNAL
 2026-10-08  Bâtiments à plusieurs adresses réalisés (choix : une entrée par
             adresse, cochée dans la fiche ; hachures si fait en partie).
             Migration 10 prête.
+2026-10-10  Bâtiments à plusieurs adresses en ligne (commit 93477f0).
+            Logements sociaux réalisés (choix : gris barré, copropriétés
+            mixtes ciblées, tap normal). Migration 11 prête.

@@ -24,6 +24,7 @@ export function recordToForm(id_batiment, record) {
     id_batiment,
     acces: record?.acces ?? null,
     logement_social: record?.logement_social ?? false,
+    pas_social: record?.pas_social ?? false,
     bal: record?.bal ?? "",
     code_entree: record?.code_entree ?? "",
     infos: record?.infos ?? "",
@@ -45,6 +46,7 @@ export function formToPayload(form) {
     id_batiment: form.id_batiment,
     acces: form.acces || null,
     logement_social: Boolean(form.logement_social),
+    pas_social: Boolean(form.pas_social),
     bal: toBal(form.bal),
     code_entree: toText(form.code_entree),
     infos: toText(form.infos),
@@ -115,14 +117,15 @@ export const hasFilters = (f) =>
 const DAYS_30 = 30 * 24 * 3600 * 1000;
 
 // Le bâtiment correspond-il à tous les filtres actifs ? (secteurId = secteur
-// du bâtiment, s'il en a un)
-export function matchesFilters(record, f, now = new Date(), secteurId = null) {
+// du bâtiment, s'il en a un ; social = logement social, d'après la fiche et
+// les données publiques)
+export function matchesFilters(record, f, now = new Date(), secteurId = null, social = Boolean(record?.logement_social)) {
   if (f.secteurId && secteurId !== f.secteurId) return false;
   if (f.typeId && record?.prospection_type_id !== f.typeId) return false;
   if (f.auteur && record?.dernier_auteur !== f.auteur) return false;
   if (f.avecCode && !record?.code_entree) return false;
   if (f.inaccessible && record?.acces !== "inaccessible") return false;
-  if (f.social && !record?.logement_social) return false;
+  if (f.social && !social) return false;
   if (f.age) {
     const recent = record?.date && now - new Date(record.date) < DAYS_30;
     if (f.age === "recent" ? !recent : recent) return false;

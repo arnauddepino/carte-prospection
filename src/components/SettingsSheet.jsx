@@ -1,14 +1,20 @@
 import { useState } from "react";
-import { AGE_STEPS, NEVER_COLOR, styleFor } from "../lib/colors";
+import { AGE_STEPS, NEVER_COLOR, SOCIAL_COLOR, styleFor } from "../lib/colors";
 import { hasFilters, NO_FILTERS } from "../lib/prospections";
 import Icon from "./Icon";
 
 const LEGEND = [...AGE_STEPS, { color: NEVER_COLOR, label: "Jamais prospecté" }];
 
-// partial : couleur de l'adresse la plus ancienne (hachures, comme sur la carte).
-function Swatch({ color, inaccessible = false, partial = null }) {
-  const { fillColor, fillOpacity, color: stroke, dashArray } = styleFor(color, { inaccessible });
-  const background = partial ? `repeating-linear-gradient(-45deg, ${color} 0 3px, ${partial} 3px 7px)` : fillColor;
+// partial : couleur de l'adresse la plus ancienne (hachures, comme sur la carte) ;
+// social : gris barré de croisillons.
+const CROISILLONS = `repeating-linear-gradient(45deg, ${SOCIAL_COLOR} 0 1px, transparent 1px 6px), repeating-linear-gradient(-45deg, ${SOCIAL_COLOR} 0 1px, #d4d4d4 1px 6px)`;
+function Swatch({ color, inaccessible = false, partial = null, social = false }) {
+  const { fillColor, fillOpacity, color: stroke, dashArray } = styleFor(color, { inaccessible, social });
+  const background = social
+    ? CROISILLONS
+    : partial
+      ? `repeating-linear-gradient(-45deg, ${color} 0 3px, ${partial} 3px 7px)`
+      : fillColor;
   return (
     <span className={`swatch${dashArray ? " dashed" : ""}`} style={{ borderColor: stroke }} aria-hidden="true">
       <span style={{ background, opacity: fillOpacity }} />
@@ -67,6 +73,10 @@ export default function SettingsSheet({
           <li>
             <Swatch color={AGE_STEPS[0].color} partial={AGE_STEPS[4].color} />
             Hachures : fait en partie (certaines adresses seulement)
+          </li>
+          <li>
+            <Swatch color={NEVER_COLOR} social />
+            Gris barré : logement social, hors cible
           </li>
         </ul>
 

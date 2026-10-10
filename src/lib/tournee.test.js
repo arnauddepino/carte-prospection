@@ -49,6 +49,9 @@ describe("sélection des bâtiments d'une tournée", () => {
     const dateOf = (id, r) => (id === "a" ? "2026-07-01T10:00:00Z" : r?.date); // « a » : une adresse oubliée
     expect(tourCandidates({ secteurId: 1, sectorOf, records, now, days: 30, dateOf }).sort()).toEqual(["a", "b", "d"]);
   });
+  test("logements sociaux écartés", () => {
+    expect(tourCandidates({ secteurId: 1, sectorOf, records, now, days: 30, isTarget: (id) => id !== "d" })).toEqual(["b"]);
+  });
 });
 
 describe("ordre de passage le plus court", () => {

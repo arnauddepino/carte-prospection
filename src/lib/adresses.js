@@ -11,18 +11,22 @@ import { colorFor } from "./colors";
 // Identifiant BAN : « <voie>_<numéro sur 5 chiffres>[_<suffixe>] ».
 const ID_BAN = /^(.+)_(\d{5})(?:_([a-z0-9]+))?$/;
 
-// Adresses d'un bâtiment : [{ id, numero, rue, label }], dans l'ordre du fichier
-// (par rue puis par numéro).
-export function adressesOf(id, data) {
+// Adresses d'un bâtiment : [{ id, numero, rue, label, social }], dans l'ordre
+// du fichier (par rue puis par numéro). sociales : identifiants BAN des
+// adresses de logements sociaux (hors cible, ignorées dans le suivi).
+export function adressesOf(id, data, sociales = new Set()) {
   const ids = data?.batiments?.[id];
   if (!ids) return [];
   return ids.map((ban) => {
     const m = ID_BAN.exec(ban);
     const numero = m ? `${Number(m[2])}${m[3] ? ` ${m[3].toUpperCase()}` : ""}` : "";
     const rue = (m && data.rues[m[1]]) ?? "";
-    return { id: ban, numero, rue, label: `${numero} ${rue}`.trim() };
+    return { id: ban, numero, rue, label: `${numero} ${rue}`.trim(), social: sociales.has(ban) };
   });
 }
+
+// Adresses à prospecter (les adresses sociales sont hors cible).
+export const adressesCibles = (list) => list.filter((a) => !a.social);
 
 // « 12, 14, 16 Rue Leblanc · 39 Rue X ». max : nombre d'adresses écrites au
 // plus, les autres sont résumées (« … et 12 autres »).
@@ -64,9 +68,10 @@ export function datesParAdresse(record, list) {
 // Date de l'adresse la moins récemment couverte (null si l'une ne l'a jamais
 // été). Sans adresse connue : date du dernier passage.
 export function oldestDate(record, list) {
-  if (list.length === 0) return record?.date ?? null;
+  const cibles = adressesCibles(list);
+  if (cibles.length === 0) return record?.date ?? null;
   let oldest;
-  for (const d of datesParAdresse(record, list).values()) {
+  for (const d of datesParAdresse(record, cibles).values()) {
     if (!d) return null;
     if (oldest === undefined || new Date(d) < new Date(oldest)) oldest = d;
   }
@@ -76,7 +81,7 @@ export function oldestDate(record, list) {
 // Bâtiment fait en partie : ses adresses ne sont pas toutes dans la même
 // tranche d'ancienneté. Renvoie la couleur de la plus ancienne, sinon null.
 export function partialColor(record, list, now = new Date()) {
-  if (list.length < 2 || !record?.date) return null;
+  if (adressesCibles(list).length < 2 || !record?.date) return null;
   const newest = colorFor(record.date, now);
   const oldest = colorFor(oldestDate(record, list), now);
   return oldest === newest ? null : oldest;

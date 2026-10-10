@@ -6,6 +6,7 @@ import { ACCES, recordToForm } from "../lib/prospections";
 import { balInfo } from "../lib/bal";
 import { datesParAdresse, formatAdresses, titreAdresses } from "../lib/adresses";
 import { colorFor } from "../lib/colors";
+import { SOCIAL_SOURCES, socialInfo, socialPatch } from "../lib/social";
 import { canDeleteFiche, canDeletePassage, canEditFiche } from "../lib/droits";
 import Icon from "./Icon";
 
@@ -25,6 +26,7 @@ export default function BuildingSheet({
   sectorName,
   balData,
   adresses = [],
+  socialData,
   pendingPassages = [],
   moi = { uid: null, isAdmin: false },
   onSaveFiche,
@@ -35,7 +37,8 @@ export default function BuildingSheet({
 }) {
   const [form, setForm] = useState(() => recordToForm(building.id, record));
   const [address, setAddress] = useState(() => osmLabel(building.properties) ?? titreAdresses(adresses));
-  const [coches, setCoches] = useState(() => new Set(adresses.map((a) => a.id))); // adresses du prochain passage
+  const cibles = adresses.filter((a) => !a.social); // adresses sociales : hors cible
+  const [coches, setCoches] = useState(() => new Set(cibles.map((a) => a.id))); // adresses du prochain passage
   const [passages, setPassages] = useState(null); // null = chargement
   const [historyError, setHistoryError] = useState(false);
   const [newPassage, setNewPassage] = useState(() => ({
@@ -82,7 +85,21 @@ export default function BuildingSheet({
   // Plusieurs adresses : le passage ajouté couvre celles cochées.
   const multi = adresses.length > 1;
   const dates = datesParAdresse(record, adresses);
-  const partiel = multi && coches.size < adresses.length;
+  const partiel = multi && cibles.some((a) => !coches.has(a.id));
+  const toutCoche = cibles.every((a) => coches.has(a.id));
+  const socialEnregistre = socialInfo(building.id, record, socialData);
+  const social = socialInfo(building.id, form, socialData);
+  const donnees = social.donnees;
+  const logements = (n) => `${n} logement${n > 1 ? "s" : ""} socia${n > 1 ? "ux" : "l"}`;
+  const socialTexte = social.social
+    ? social.source === "saisie"
+      ? "Coché dans l’appli : bâtiment hors cible."
+      : `${SOCIAL_SOURCES[social.source]} : ${logements(donnees.logements)}. Hors cible ; décochez si c’est une erreur.`
+    : social.corrige
+      ? `Le répertoire indique ${logements(donnees.logements)}, mais ce bâtiment a été décoché dans l’appli : il reste ciblé.`
+      : donnees?.categorie === "mixte"
+        ? `Copropriété avec ${logements(donnees.logements)} : reste ciblée. Source : ${SOCIAL_SOURCES[donnees.source]}.`
+        : null;
   const couvertes = (p) => p.adresses?.length && formatAdresses(adresses.filter((a) => p.adresses.includes(a.id)));
   const toggle = (id) =>
     setCoches((c) => {
@@ -102,6 +119,7 @@ export default function BuildingSheet({
         <div>
           <h2>{address ?? "Bâtiment"}</h2>
           {sectorName && <p className="sheet-sector">{sectorName}</p>}
+          {socialEnregistre.social && <p className="sheet-social">Logement social · hors cible</p>}
           <p className="sheet-subtitle">
             {record?.date
               ? [
@@ -182,11 +200,12 @@ export default function BuildingSheet({
           <label className="checkbox">
             <input
               type="checkbox"
-              checked={form.logement_social}
-              onChange={(e) => setForm({ ...form, logement_social: e.target.checked })}
+              checked={social.social}
+              onChange={(e) => setForm({ ...form, ...socialPatch(building.id, e.target.checked, socialData) })}
             />
-            Logement social
+            Logement social (hors cible)
           </label>
+          {socialTexte && <p className="social-source">{socialTexte}</p>}
 
           <div className="field">
             <label htmlFor="f-infos">Infos</label>
@@ -209,9 +228,9 @@ export default function BuildingSheet({
               <button
                 type="button"
                 className="button text small"
-                onClick={() => setCoches(new Set(coches.size === adresses.length ? [] : adresses.map((a) => a.id)))}
+                onClick={() => setCoches(new Set(toutCoche ? [] : cibles.map((a) => a.id)))}
               >
-                {coches.size === adresses.length ? "Tout décocher" : "Tout cocher"}
+                {toutCoche ? "Tout décocher" : "Tout cocher"}
               </button>
             </div>
             <p className="hint">Cochez les adresses faites, puis ajoutez le passage ci-dessous.</p>
@@ -223,6 +242,7 @@ export default function BuildingSheet({
                     <label className="checkbox">
                       <input type="checkbox" checked={coches.has(a.id)} onChange={() => toggle(a.id)} />
                       {a.label}
+                      {a.social && <span className="badge">social</span>}
                     </label>
                     <span className="adresse-date">
                       <span className="dot" style={{ background: colorFor(d) }} aria-hidden="true" />
@@ -272,7 +292,7 @@ export default function BuildingSheet({
               className="button secondary"
               disabled={busy || !newPassage.date || !newPassage.typeId || (multi && coches.size === 0)}
             >
-              {partiel ? `Ajouter (${coches.size}/${adresses.length})` : "Ajouter"}
+              {partiel ? `Ajouter (${cibles.filter((a) => coches.has(a.id)).length}/${cibles.length})` : "Ajouter"}
             </button>
           </form>
 

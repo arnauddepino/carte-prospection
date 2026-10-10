@@ -32,3 +32,6 @@ export const useBalData = () => useStaticJson("bal-15e.json");
 
 // Adresses de chaque bâtiment (Base Adresse Nationale + cadastre).
 export const useAdressesData = () => useStaticJson("adresses-15e.json");
+
+// Logements sociaux (répertoire national RPLS + Ville de Paris).
+export const useSocialData = () => useStaticJson("social-15e.json");

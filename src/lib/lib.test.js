@@ -74,7 +74,7 @@ describe("fiche", () => {
     const form = recordToForm("way/1", record);
     expect(form.bal).toBe(0);
     expect(formToPayload(form)).toEqual({
-      id_batiment: "way/1", acces: "code", logement_social: true, bal: 0, code_entree: "A1234", infos: "gardien le matin",
+      id_batiment: "way/1", acces: "code", logement_social: true, pas_social: false, bal: 0, code_entree: "A1234", infos: "gardien le matin",
     });
   });
 
@@ -148,11 +148,11 @@ describe("export CSV", () => {
     const records = new Map([
       ["way/1", { id_batiment: "way/1", date: "2026-10-01T10:00:00Z", prospection_type_id: 1, dernier_auteur: "Léa", bal: 12, acces: "code", code_entree: "A1", infos: 'dit "bonjour"; sympa', logement_social: true }],
     ]);
-    const csv = fichesCsv(records, types, new Map([["way/1", [48.8451234, 2.2912346]]]));
+    const csv = fichesCsv(records, types, { centers: new Map([["way/1", [48.8451234, 2.2912346]]]) });
     expect(csv.startsWith("\uFEFF")).toBe(true);
     const [header, line] = csv.slice(1).split("\r\n");
     expect(header.split(";")[0]).toBe("Bâtiment");
-    expect(line).toContain(";Flyer A;Léa;12;Saisie dans l’appli;Code;A1;oui;");
+    expect(line).toContain(";Flyer A;Léa;12;Saisie dans l’appli;Code;A1;oui;Coché dans l’appli;");
     expect(line).toContain('"dit ""bonjour""; sympa"');
     expect(line.endsWith(";48.845123;2.291235")).toBe(true);
   });
@@ -168,7 +168,7 @@ describe("export CSV", () => {
       { id: "a14", numero: "14", rue: "Rue Leblanc" },
     ];
     const records = new Map([["way/1", { id_batiment: "way/1", date: "2026-10-01T10:00:00Z", prospection_type_id: 1 }]]);
-    const fiches = fichesCsv(records, types, new Map(), undefined, () => list).slice(1).split("\r\n");
+    const fiches = fichesCsv(records, types, { adressesFor: () => list }).slice(1).split("\r\n");
     expect(fiches[0].split(";")[1]).toBe("Adresses");
     expect(fiches[1]).toContain("way/1;12, 14 Rue Leblanc;");
     const passages = [

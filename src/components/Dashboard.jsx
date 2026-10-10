@@ -16,7 +16,8 @@ const fmt = (n) => Math.round(n).toLocaleString("fr-FR");
 const shortDate = (d) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
 // Tableau de bord : activité de l'équipe et couverture des secteurs.
-export default function Dashboard({ records, types, secteurs, sectorOf, balData, now, onClose }) {
+// isTarget(id) : bâtiment ciblé (les logements sociaux ne comptent pas dans la couverture).
+export default function Dashboard({ records, types, secteurs, sectorOf, isTarget = () => true, balData, now, onClose }) {
   const [weeks, setWeeks] = useStoredState("prospection.tableau.semaines", 12);
   const [secteurId, setSecteurId] = useState(null);
   const [state, setState] = useState({ loading: true, error: null, passages: [] });
@@ -44,11 +45,13 @@ export default function Dashboard({ records, types, secteurs, sectorOf, balData,
 
     // Bâtiments dont on mesure la couverture.
     const universe = new Set(
-      secteurId
-        ? [...sectorOf].filter(([, s]) => s === secteurId).map(([id]) => id)
-        : secteurs.length
-          ? sectorOf.keys()
-          : records.keys()
+      [
+        ...(secteurId
+          ? [...sectorOf].filter(([, s]) => s === secteurId).map(([id]) => id)
+          : secteurs.length
+            ? sectorOf.keys()
+            : records.keys()),
+      ].filter(isTarget)
     );
     const weekEnds = starts.map((s) => new Date(Math.min(+s + 7 * 864e5 - 1, +now)));
     const coverage = coverageSeries(passages, universe, weekEnds);
@@ -85,10 +88,10 @@ export default function Dashboard({ records, types, secteurs, sectorOf, balData,
       byAuteur: foldOthers(groupBy(current, (p) => p.auteur ?? "Sans prénom", balOf), 8),
       byType: foldOthers(groupBy(current, (p) => typeName(p.prospection_type_id), balOf), 8),
       bySector: secteurs
-        .map((s) => ({ s, st: sectorStats(s.id, sectorOf, records, now) }))
+        .map((s) => ({ s, st: sectorStats(s.id, sectorOf, records, now, 30, isTarget) }))
         .sort((a, b) => b.st.pct - a.st.pct),
     };
-  }, [state, weeks, secteurId, sectorOf, records, types, secteurs, now]);
+  }, [state, weeks, secteurId, sectorOf, isTarget, records, types, secteurs, now]);
 
   const nowCoverage = view.coverage.at(-1);
   const periodLabel = PERIODS.find((p) => p.weeks === weeks)?.label ?? `${weeks} semaines`;

@@ -10,12 +10,13 @@ import { useToasts } from "./hooks/useToasts";
 import { useLocate } from "./hooks/useLocate";
 import { loadStreets, useSecteurs } from "./hooks/useSecteurs";
 import { useSectorDraft } from "./hooks/useSectorDraft";
-import { useAdressesData, useBalData } from "./hooks/useStaticData";
+import { useAdressesData, useBalData, useSocialData } from "./hooks/useStaticData";
 import { useAuth } from "./hooks/useAuth";
 import { canEditSectors } from "./lib/droits";
 import { balInfo, flyersPlan } from "./lib/bal";
 import { planTour, tourCandidates } from "./lib/tournee";
 import { adressesOf, formatAdresses, oldestDate } from "./lib/adresses";
+import { adressesSociales, socialInfo } from "./lib/social";
 import { reverseAddress } from "./lib/adresse";
 import {
   assignBuildings,
@@ -150,7 +151,11 @@ function ProspectionMap({ auth }) {
   const now = useNow();
   const balData = useBalData();
   const adressesData = useAdressesData();
-  const adressesFor = useCallback((id) => adressesOf(id, adressesData), [adressesData]);
+  const socialData = useSocialData();
+  const adressesFor = useCallback(
+    (id) => adressesOf(id, adressesData, adressesSociales(id, socialData)),
+    [adressesData, socialData]
+  );
   const [tour, setTour] = useStoredState("prospection.tournee", null);
   const [tourSummary, setTourSummary] = useState(null);
   const [adresses, setAdresses] = useStoredState("prospection.cache.adresses", {});
@@ -171,9 +176,14 @@ function ProspectionMap({ auth }) {
     if (needsStreets && !graph) loadStreets().then(setGraph).catch((e) => console.error("Plan des rues :", e));
   }, [needsStreets, graph]);
   const sectorOf = useMemo(() => assignBuildings(secteurs, centers, graph), [secteurs, centers, graph]);
+
+  // Logements sociaux : grisés, hors tournées et hors couverture.
+  const socialOf = useCallback((id, record = records.get(id)) => socialInfo(id, record, socialData), [records, socialData]);
+  const isSocial = useCallback((id) => socialOf(id).social, [socialOf]);
+  const isTarget = useCallback((id) => !isSocial(id), [isSocial]);
   const stats = useMemo(
-    () => new Map(secteurs.map((s) => [s.id, sectorStats(s.id, sectorOf, records, now)])),
-    [secteurs, sectorOf, records, now]
+    () => new Map(secteurs.map((s) => [s.id, sectorStats(s.id, sectorOf, records, now, 30, isTarget)])),
+    [secteurs, sectorOf, records, now, isTarget]
   );
 
   // Prénoms connus, pour le filtre « Dernier passage par ».
@@ -482,8 +492,9 @@ function ProspectionMap({ auth }) {
         days: p.days,
         includeInaccessible: p.includeInaccessible,
         dateOf: (id, r) => oldestDate(r, adressesFor(id)),
+        isTarget,
       }),
-    [sectorOf, records, now, adressesFor]
+    [sectorOf, records, now, adressesFor, isTarget]
   );
   const planOf = useCallback((ids) => flyersPlan(ids, infoOf), [infoOf]);
 
@@ -542,7 +553,7 @@ function ProspectionMap({ auth }) {
 
   const handleExport = async (what) => {
     if (what === "fiches") {
-      downloadText(`prospection-fiches-${today()}.csv`, fichesCsv(records, types, centers, infoOf, adressesFor));
+      downloadText(`prospection-fiches-${today()}.csv`, fichesCsv(records, types, { centers, infoOf, adressesFor, socialOf }));
       return;
     }
     const { data, error } = await fetchPassages();
@@ -587,6 +598,7 @@ function ProspectionMap({ auth }) {
             records={records}
             sectorOf={sectorOf}
             adressesData={adressesData}
+            isSocial={isSocial}
             filters={filters}
             focus={tourInfo?.focus}
             now={now}
@@ -660,6 +672,7 @@ function ProspectionMap({ auth }) {
           sectorName={secteurs.find((s) => s.id === sectorOf.get(sheet.building.id))?.nom}
           balData={balData}
           adresses={adressesFor(sheet.building.id)}
+          socialData={socialData}
           moi={moi}
           pendingPassages={pending
             .filter((op) => op.type === "passage" && op.payload.id_batiment === sheet.building.id)
@@ -827,6 +840,7 @@ function ProspectionMap({ auth }) {
             types={types}
             secteurs={secteurs}
             sectorOf={sectorOf}
+            isTarget={isTarget}
             balData={balData}
             now={now}
             onClose={() => setDashboardOpen(false)}

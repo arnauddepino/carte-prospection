@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { adressesOf, datesParAdresse, formatAdresses, oldestDate, partialColor, titreAdresses } from "./adresses";
 import { AGE_STEPS, NEVER_COLOR } from "./colors";
 import { applyPassage, passagePayload } from "./prospections";
+import { adressesSociales, socialInfo, socialPatch } from "./social";
 
 const data = {
   rues: { "75115_3392": "Rue Leblanc", "75115_lrfm3a": "Square Max Hymans" },
@@ -99,3 +100,33 @@ describe("suivi par adresse", () => {
     expect(passagePayload({ id_batiment: "way/1", typeId: 1, adresses: [a12] }).adresses).toEqual([a12]);
   });
 });
+
+describe("logements sociaux", () => {
+  const social = { batiments: { "way/s": [40, "social", "rpls", []], "way/m": [3, "mixte", "rpls", ["75115_3392_00014"]] } };
+
+  test("immeuble social d'après les données, sauf correction dans la fiche", () => {
+    expect(socialInfo("way/s", undefined, social)).toMatchObject({ social: true, source: "rpls" });
+    expect(socialInfo("way/s", { pas_social: true }, social)).toMatchObject({ social: false, corrige: true });
+    expect(socialInfo("way/m", undefined, social)).toMatchObject({ social: false, donnees: { categorie: "mixte", logements: 3 } });
+    expect(socialInfo("way/x", { logement_social: true }, social)).toMatchObject({ social: true, source: "saisie" });
+    expect(socialInfo("way/x", undefined, null).social).toBe(false);
+  });
+
+  test("case de la fiche : corrige la donnée ou coche à la main", () => {
+    expect(socialPatch("way/s", false, social)).toEqual({ logement_social: false, pas_social: true });
+    expect(socialPatch("way/s", true, social)).toEqual({ logement_social: false, pas_social: false });
+    expect(socialPatch("way/x", true, social)).toEqual({ logement_social: true, pas_social: false });
+  });
+
+  test("adresses sociales d'un bloc mixte : ignorées dans le suivi", () => {
+    const mixte = adressesOf("way/1", data, adressesSociales("way/1", { batiments: { "way/1": [3, "mixte", "rpls", [a3]] } }));
+    expect(mixte.find((a) => a.id === a3).social).toBe(true);
+    let r = applyPassage(undefined, partiel("2026-10-07T10:00:00Z", [a12, a14, a14b]));
+    expect(oldestDate(r, mixte)).toBe("2026-10-07T10:00:00Z"); // 3 Square Max Hymans (social) non compté
+    expect(partialColor(r, mixte, now)).toBeNull();
+  });
+});
+
+function partiel(date, adresses) {
+  return { id_batiment: "way/1", date, prospection_type_id: 1, adresses };
+}
