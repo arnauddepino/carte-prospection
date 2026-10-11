@@ -7,6 +7,8 @@ import { balInfo } from "../lib/bal";
 import { datesParAdresse, formatAdresses, titreAdresses } from "../lib/adresses";
 import { colorFor } from "../lib/colors";
 import { SOCIAL_SOURCES, socialInfo, socialPatch } from "../lib/social";
+import { choixFrom, choixValue, dateMode, MODES, passageLabel } from "../lib/modes";
+import ContactsSection from "./ContactsSection";
 import { canDeleteFiche, canDeletePassage, canEditFiche } from "../lib/droits";
 import Icon from "./Icon";
 
@@ -27,6 +29,10 @@ export default function BuildingSheet({
   balData,
   adresses = [],
   socialData,
+  terrain = "boitage",
+  estMembre = false,
+  onAccount,
+  onError,
   pendingPassages = [],
   moi = { uid: null, isAdmin: false },
   onSaveFiche,
@@ -43,8 +49,9 @@ export default function BuildingSheet({
   const [historyError, setHistoryError] = useState(false);
   const [newPassage, setNewPassage] = useState(() => ({
     date: toDateInputValue(new Date().toISOString()),
-    typeId: selectedType,
+    choix: choixValue({ mode: terrain, typeId: selectedType }),
   }));
+  const nouveau = choixFrom(newPassage.choix);
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(null); // id du passage ou "fiche" à confirmer
 
@@ -85,7 +92,7 @@ export default function BuildingSheet({
   // Plusieurs adresses : le passage ajouté couvre celles cochées.
   const multi = adresses.length > 1;
   const dates = datesParAdresse(record, adresses);
-  const partiel = multi && cibles.some((a) => !coches.has(a.id));
+  const partiel = multi && nouveau.mode === "boitage" && cibles.some((a) => !coches.has(a.id));
   const toutCoche = cibles.every((a) => coches.has(a.id));
   const socialEnregistre = socialInfo(building.id, record, socialData);
   const social = socialInfo(building.id, form, socialData);
@@ -122,14 +129,15 @@ export default function BuildingSheet({
           {socialEnregistre.social && <p className="sheet-social">Logement social · hors cible</p>}
           <p className="sheet-subtitle">
             {record?.date
-              ? [
-                  `Dernier passage ${relativeDay(record.date)}`,
-                  typeName(record.prospection_type_id),
-                  record.dernier_auteur && `par ${record.dernier_auteur}`,
-                ]
-                  .filter(Boolean)
-                  .join(" · ")
-              : "Jamais prospecté"}
+              ? [`Boîtage ${relativeDay(record.date)}`, typeName(record.prospection_type_id)].filter(Boolean).join(" · ")
+              : "Jamais boîté"}
+            {MODES.filter((m) => m.value !== "boitage" && dateMode(record, m.value)).map((m) => (
+              <span key={m.value}>
+                {" · "}
+                {m.court} {relativeDay(dateMode(record, m.value))}
+              </span>
+            ))}
+            {record?.dernier_auteur && ` · dernier passage par ${record.dernier_auteur}`}
           </p>
         </div>
         <button className="icon-button" aria-label="Fermer la fiche" onClick={onClose}>
@@ -220,6 +228,9 @@ export default function BuildingSheet({
           </fieldset>
         </form>
 
+        {/* ─── Gardien et commerçants ─── */}
+        <ContactsSection idBatiment={building.id} estMembre={estMembre} onAccount={onAccount} onError={onError} />
+
         {/* ─── Adresses d'un bâtiment dessiné d'un seul bloc ─── */}
         {multi && (
           <section className="sheet-section" aria-labelledby="adresses-title">
@@ -233,7 +244,7 @@ export default function BuildingSheet({
                 {toutCoche ? "Tout décocher" : "Tout cocher"}
               </button>
             </div>
-            <p className="hint">Cochez les adresses faites, puis ajoutez le passage ci-dessous.</p>
+            <p className="hint">Boîtage : cochez les adresses faites, puis ajoutez le passage ci-dessous.</p>
             <ul className="adresses">
               {adresses.map((a) => {
                 const d = dates.get(a.id);
@@ -263,7 +274,14 @@ export default function BuildingSheet({
             className="passage-add"
             onSubmit={async (e) => {
               e.preventDefault();
-              await run(() => onAddPassage({ ...newPassage, adresses: partiel ? adresses.filter((a) => coches.has(a.id)).map((a) => a.id) : null }));
+              await run(() =>
+                onAddPassage({
+                  date: newPassage.date,
+                  mode: nouveau.mode,
+                  typeId: nouveau.typeId,
+                  adresses: partiel ? adresses.filter((a) => coches.has(a.id)).map((a) => a.id) : null,
+                })
+              );
               loadPassages();
             }}
           >
@@ -274,23 +292,32 @@ export default function BuildingSheet({
               onChange={(e) => setNewPassage({ ...newPassage, date: e.target.value })}
             />
             <select
-              aria-label="Type du passage"
-              value={newPassage.typeId ?? ""}
-              onChange={(e) => setNewPassage({ ...newPassage, typeId: e.target.value ? Number(e.target.value) : null })}
+              aria-label="Prospection du passage"
+              value={newPassage.choix}
+              onChange={(e) => setNewPassage({ ...newPassage, choix: e.target.value })}
             >
               <option value="" disabled>
-                Type…
+                Prospection…
               </option>
-              {types.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
+              <optgroup label="Boîtage : série de flyers">
+                {types.map((t) => (
+                  <option key={t.id} value={`t:${t.id}`}>
+                    {t.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Autres prospections">
+                {MODES.filter((m) => m.value !== "boitage").map((m) => (
+                  <option key={m.value} value={`m:${m.value}`}>
+                    {m.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
             <button
               type="submit"
               className="button secondary"
-              disabled={busy || !newPassage.date || !newPassage.typeId || (multi && coches.size === 0)}
+              disabled={busy || !newPassage.date || !newPassage.choix || (partiel && coches.size === 0)}
             >
               {partiel ? `Ajouter (${cibles.filter((a) => coches.has(a.id)).length}/${cibles.length})` : "Ajouter"}
             </button>
@@ -303,7 +330,7 @@ export default function BuildingSheet({
                   <div>
                     <strong>{longDate(p.date)}</strong>
                     <span>
-                      {[typeName(p.prospection_type_id) ?? "Sans type", p.auteur && `par ${p.auteur}`]
+                      {[passageLabel(p, typeName), p.auteur && `par ${p.auteur}`]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>
@@ -330,7 +357,7 @@ export default function BuildingSheet({
                   <div>
                     <strong>{longDate(p.date)}</strong>
                     <span>
-                      {[typeName(p.prospection_type_id) ?? "Sans type", p.auteur && `par ${p.auteur}`]
+                      {[passageLabel(p, typeName), p.auteur && `par ${p.auteur}`]
                         .filter(Boolean)
                         .join(" · ")}
                     </span>

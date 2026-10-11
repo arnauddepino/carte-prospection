@@ -17,6 +17,8 @@ import { balInfo, flyersPlan } from "./lib/bal";
 import { planTour, tourCandidates } from "./lib/tournee";
 import { adressesOf, formatAdresses, oldestDate } from "./lib/adresses";
 import { adressesSociales, socialInfo } from "./lib/social";
+import { dateMode, modeInfo, socialHorsCible } from "./lib/modes";
+import { AccountDialog, TeamSheet } from "./components/AccountSheets";
 import { reverseAddress } from "./lib/adresse";
 import {
   assignBuildings,
@@ -134,6 +136,9 @@ function ProspectionMap({ auth }) {
   const { types, create: createType } = useProspectTypes();
   const [mode, setMode] = useStoredState("prospection.mode", "prospect");
   const [storedType, setSelectedType] = useStoredState("prospection.type", null);
+  // Mode de prospection terrain : boîtage (série de flyers), porte-à-porte, gardien, commerçant.
+  const [terrain, setTerrain] = useStoredState("prospection.terrain", "boitage");
+  const [accountOpen, setAccountOpen] = useState(false);
   const [storedFilters, setFilters] = useStoredState("prospection.filtres", NO_FILTERS);
   const [auteur, setAuteur] = useStoredState("prospection.auteur", null);
   const [editingAuteur, setEditingAuteur] = useState(false);
@@ -180,10 +185,16 @@ function ProspectionMap({ auth }) {
   // Logements sociaux : grisés, hors tournées et hors couverture.
   const socialOf = useCallback((id, record = records.get(id)) => socialInfo(id, record, socialData), [records, socialData]);
   const isSocial = useCallback((id) => socialOf(id).social, [socialOf]);
-  const isTarget = useCallback((id) => !isSocial(id), [isSocial]);
+  // Bâtiments ciblés : sans les logements sociaux (sauf pour les commerçants).
+  const isTargetFor = useCallback((m) => (socialHorsCible(m) ? (id) => !isSocial(id) : () => true), [isSocial]);
+  const isTarget = useMemo(() => isTargetFor(terrain), [isTargetFor, terrain]);
+  const isTargetBoitage = useMemo(() => isTargetFor("boitage"), [isTargetFor]);
   const stats = useMemo(
-    () => new Map(secteurs.map((s) => [s.id, sectorStats(s.id, sectorOf, records, now, 30, isTarget)])),
-    [secteurs, sectorOf, records, now, isTarget]
+    () =>
+      new Map(
+        secteurs.map((s) => [s.id, sectorStats(s.id, sectorOf, records, { now, isTarget, dateOf: (id, r) => dateMode(r, terrain) })])
+      ),
+    [secteurs, sectorOf, records, now, isTarget, terrain]
   );
 
   // Prénoms connus, pour le filtre « Dernier passage par ».
@@ -239,8 +250,8 @@ function ProspectionMap({ auth }) {
         openBuilding(building);
         return;
       }
-      if (!selectedType) {
-        show({ kind: "info", text: "Choisissez d’abord le type de prospection." });
+      if (terrain === "boitage" && !selectedType) {
+        show({ kind: "info", text: "Choisissez d’abord la série de flyers distribuée." });
         const select = typeSelectRef.current;
         try {
           select?.showPicker();
@@ -251,11 +262,11 @@ function ProspectionMap({ auth }) {
       }
 
       // Le bâtiment se colore tout de suite ; l'envoi se fait en arrière-plan.
-      const handle = addPassage(passagePayload({ id_batiment: building.id, typeId: selectedType, auteur }));
+      const handle = addPassage(passagePayload({ id_batiment: building.id, typeId: selectedType, auteur, mode: terrain }));
       navigator.vibrate?.(20);
       show({
         kind: "success",
-        text: `✓ Prospecté · ${types.find((t) => t.id === selectedType)?.name}`,
+        text: terrain === "boitage" ? `✓ Boîtage · ${types.find((t) => t.id === selectedType)?.name}` : `✓ ${modeInfo(terrain).fait}`,
         action: {
           label: "Annuler",
           run: () => {
@@ -265,7 +276,7 @@ function ProspectionMap({ auth }) {
         },
       });
     },
-    [draft.active, sheet?.kind, mode, selectedType, auteur, types, addPassage, undoPassage, show, openBuilding]
+    [draft.active, sheet?.kind, mode, terrain, selectedType, auteur, types, addPassage, undoPassage, show, openBuilding]
   );
 
   const handleSaveFiche = (form) => {
@@ -273,8 +284,8 @@ function ProspectionMap({ auth }) {
     show({ kind: "success", text: `✓ Fiche enregistrée${later}` });
   };
 
-  const handleAddPassage = (id_batiment, { date, typeId, adresses }) => {
-    addPassage(passagePayload({ id_batiment, date, typeId, auteur, adresses }));
+  const handleAddPassage = (id_batiment, { date, typeId, adresses, mode: m }) => {
+    addPassage(passagePayload({ id_batiment, date, typeId, auteur, adresses, mode: m }));
     show({ kind: "success", text: `✓ Passage ajouté${later}` });
   };
 
@@ -492,9 +503,9 @@ function ProspectionMap({ auth }) {
         days: p.days,
         includeInaccessible: p.includeInaccessible,
         dateOf: (id, r) => oldestDate(r, adressesFor(id)),
-        isTarget,
+        isTarget: isTargetBoitage,
       }),
-    [sectorOf, records, now, adressesFor, isTarget]
+    [sectorOf, records, now, adressesFor, isTargetBoitage]
   );
   const planOf = useCallback((ids) => flyersPlan(ids, infoOf), [infoOf]);
 
@@ -526,6 +537,7 @@ function ProspectionMap({ auth }) {
       plan: flyersPlan(plan.ids, infoOf),
     });
     setSelectedType(params.typeId);
+    setTerrain("boitage");
     setMode("prospect");
     setSheet(null);
     if (plan.route.length > 1) map?.fitBounds(plan.route, { paddingTopLeft: [24, 140], paddingBottomRight: [24, 170] });
@@ -597,7 +609,8 @@ function ProspectionMap({ auth }) {
             buildings={buildings}
             records={records}
             sectorOf={sectorOf}
-            adressesData={adressesData}
+            adressesFor={adressesFor}
+            terrain={terrain}
             isSocial={isSocial}
             filters={filters}
             focus={tourInfo?.focus}
@@ -673,6 +686,10 @@ function ProspectionMap({ auth }) {
           balData={balData}
           adresses={adressesFor(sheet.building.id)}
           socialData={socialData}
+          terrain={terrain}
+          estMembre={auth.estMembre}
+          onAccount={() => setAccountOpen(true)}
+          onError={(e) => show({ kind: "error", text: e?.message ?? "Action impossible." })}
           moi={moi}
           pendingPassages={pending
             .filter((op) => op.type === "passage" && op.payload.id_batiment === sheet.building.id)
@@ -694,7 +711,15 @@ function ProspectionMap({ auth }) {
           onCreateType={handleCreateType}
           onExport={handleExport}
           auteur={auteur}
+          terrain={terrain}
           isAdmin={auth.isAdmin}
+          compte={{ email: auth.email, membre: auth.membre }}
+          onAccount={() => setAccountOpen(true)}
+          onSignOut={async () => {
+            await auth.becomeUser();
+            show({ kind: "info", text: "Déconnecté : accès limité, sans les coordonnées des contacts." });
+          }}
+          onTeam={() => setSheet({ kind: "team" })}
           onChangeAuteur={() => setEditingAuteur(true)}
           onClose={() => setSheet(null)}
         />
@@ -772,7 +797,11 @@ function ProspectionMap({ auth }) {
         onMode={changeMode}
         types={types}
         selectedType={selectedType}
-        onSelectType={setSelectedType}
+        terrain={terrain}
+        onChoix={({ mode: m, typeId }) => {
+          setTerrain(m);
+          if (typeId) setSelectedType(typeId);
+        }}
         typeSelectRef={typeSelectRef}
         locating={locate.active}
         onLocate={locate.toggle}
@@ -840,7 +869,8 @@ function ProspectionMap({ auth }) {
             types={types}
             secteurs={secteurs}
             sectorOf={sectorOf}
-            isTarget={isTarget}
+            isTargetFor={isTargetFor}
+            terrain={terrain}
             balData={balData}
             now={now}
             onClose={() => setDashboardOpen(false)}
@@ -848,6 +878,26 @@ function ProspectionMap({ auth }) {
         </ErrorBoundary>
       )}
 
+      {sheet?.kind === "team" && <TeamSheet onClose={() => setSheet({ kind: "settings" })} />}
+      {accountOpen && (
+        <AccountDialog
+          prenom={auteur}
+          onSignIn={auth.signIn}
+          onSignUp={auth.signUp}
+          onDone={(membre) => {
+            if (membre?.prenom) setAuteur(membre.prenom);
+            setAccountOpen(false);
+            show({
+              kind: "success",
+              text:
+                membre?.statut === "actif" || auth.isAdmin
+                  ? "✓ Connecté : coordonnées des contacts visibles"
+                  : "✓ Compte en attente de validation par l’administrateur",
+            });
+          }}
+          onCancel={() => setAccountOpen(false)}
+        />
+      )}
       {(!auteur || editingAuteur) && (
         <IdentitySheet
           current={auteur}

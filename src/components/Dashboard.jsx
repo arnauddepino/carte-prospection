@@ -3,6 +3,7 @@ import { fetchPassages } from "../hooks/useProspections";
 import { useStoredState } from "../hooks/useStoredState";
 import { sectorStats } from "../lib/secteurs";
 import { balInfo } from "../lib/bal";
+import { dateMode, MODES } from "../lib/modes";
 import { coverageSeries, deltaPct, foldOthers, groupBy, perWeek, selectPassages, weekStarts } from "../lib/stats";
 import { BarList, ChartCard, ColumnChart, LineChart, StatTile } from "./Charts";
 import Icon from "./Icon";
@@ -16,9 +17,12 @@ const fmt = (n) => Math.round(n).toLocaleString("fr-FR");
 const shortDate = (d) => d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
 
 // Tableau de bord : activité de l'équipe et couverture des secteurs.
-// isTarget(id) : bâtiment ciblé (les logements sociaux ne comptent pas dans la couverture).
-export default function Dashboard({ records, types, secteurs, sectorOf, isTarget = () => true, balData, now, onClose }) {
+// isTargetFor(mode) → isTarget(id) : bâtiment ciblé pour ce mode (les logements
+// sociaux ne comptent pas dans la couverture) ; terrain : mode affiché au départ.
+export default function Dashboard({ records, types, secteurs, sectorOf, isTargetFor = () => () => true, terrain = "boitage", balData, now, onClose }) {
   const [weeks, setWeeks] = useStoredState("prospection.tableau.semaines", 12);
+  const [mode, setMode] = useState(terrain);
+  const boitage = mode === "boitage";
   const [secteurId, setSecteurId] = useState(null);
   const [state, setState] = useState({ loading: true, error: null, passages: [] });
 
@@ -31,7 +35,8 @@ export default function Dashboard({ records, types, secteurs, sectorOf, isTarget
   }, []);
 
   const view = useMemo(() => {
-    const { passages } = state;
+    const passages = (state.passages ?? []).filter((p) => (p.mode ?? "boitage") === mode);
+    const isTarget = isTargetFor(mode);
     const starts = weekStarts(now, weeks);
     const from = starts[0];
     const to = new Date(+now + 1);
@@ -40,7 +45,7 @@ export default function Dashboard({ records, types, secteurs, sectorOf, isTarget
     const current = selectPassages(passages, { from, to, ...opts });
     const previous = selectPassages(passages, { from: prevFrom, to: from, ...opts });
     const infoOf = (id) => balInfo(id, records.get(id), balData);
-    const balOf = (id) => infoOf(id).value;
+    const balOf = (id) => (mode === "boitage" ? infoOf(id).value : null);
     const typeName = (id) => types.find((t) => t.id === id)?.name ?? "Sans type";
 
     // Bâtiments dont on mesure la couverture.
@@ -59,7 +64,7 @@ export default function Dashboard({ records, types, secteurs, sectorOf, isTarget
     const sum = (list) =>
       list.reduce(
         (acc, p) => {
-          const info = infoOf(p.id_batiment);
+          const info = mode === "boitage" ? infoOf(p.id_batiment) : { value: null };
           if (info.value == null) return acc;
           return {
             flyers: acc.flyers + info.value,
@@ -88,10 +93,10 @@ export default function Dashboard({ records, types, secteurs, sectorOf, isTarget
       byAuteur: foldOthers(groupBy(current, (p) => p.auteur ?? "Sans prénom", balOf), 8),
       byType: foldOthers(groupBy(current, (p) => typeName(p.prospection_type_id), balOf), 8),
       bySector: secteurs
-        .map((s) => ({ s, st: sectorStats(s.id, sectorOf, records, now, 30, isTarget) }))
+        .map((s) => ({ s, st: sectorStats(s.id, sectorOf, records, { now, isTarget, dateOf: (id, r) => dateMode(r, mode) }) }))
         .sort((a, b) => b.st.pct - a.st.pct),
     };
-  }, [state, weeks, secteurId, sectorOf, isTarget, records, types, secteurs, now]);
+  }, [state, weeks, mode, secteurId, sectorOf, isTargetFor, records, types, secteurs, now]);
 
   const nowCoverage = view.coverage.at(-1);
   const periodLabel = PERIODS.find((p) => p.weeks === weeks)?.label ?? `${weeks} semaines`;
@@ -108,6 +113,13 @@ export default function Dashboard({ records, types, secteurs, sectorOf, isTarget
 
       {/* Filtres : ils s'appliquent à tout le tableau. */}
       <div className="dashboard-filters">
+        <select aria-label="Prospection" value={mode} onChange={(e) => setMode(e.target.value)}>
+          {MODES.map((m) => (
+            <option key={m.value} value={m.value}>
+              {m.label}
+            </option>
+          ))}
+        </select>
         <div className="segmented" role="group" aria-label="Période">
           {PERIODS.map((p) => (
             <button key={p.weeks} type="button" aria-pressed={weeks === p.weeks} onClick={() => setWeeks(p.weeks)}>
@@ -145,13 +157,15 @@ export default function Dashboard({ records, types, secteurs, sectorOf, isTarget
               note={`${fmt(nowCoverage?.covered ?? 0)} / ${fmt(view.universeSize)} bâtiments prospectés depuis moins de 30 jours`}
             />
             <StatTile label={`Passages · ${periodLabel}`} value={fmt(view.count)} delta={view.countDelta} deltaLabel={vsPrevious} />
-            <StatTile
-              label="Flyers estimés"
-              value={fmt(view.flyers)}
-              delta={view.flyersDelta}
-              deltaLabel={vsPrevious}
-              note={`${view.estimated ? `dont ≈ ${fmt(view.estimated)} estimés · ` : ""}boîtes aux lettres connues ou estimées pour ${view.knownShare} % des passages`}
-            />
+            {boitage && (
+              <StatTile
+                label="Flyers estimés"
+                value={fmt(view.flyers)}
+                delta={view.flyersDelta}
+                deltaLabel={vsPrevious}
+                note={`${view.estimated ? `dont ≈ ${fmt(view.estimated)} estimés · ` : ""}boîtes aux lettres connues ou estimées pour ${view.knownShare} % des passages`}
+              />
+            )}
             <StatTile label="Collègues actifs" value={fmt(view.auteurs)} note={periodLabel} />
           </div>
 
@@ -163,15 +177,15 @@ export default function Dashboard({ records, types, secteurs, sectorOf, isTarget
                 title="Passages par semaine"
                 subtitle="Semaines commençant le lundi"
                 table={{
-                  columns: ["Semaine du", "Passages", "Flyers estimés"],
-                  rows: view.perWeek.map((w) => [shortDate(w.start), fmt(w.count), fmt(w.flyers)]),
+                  columns: boitage ? ["Semaine du", "Passages", "Flyers estimés"] : ["Semaine du", "Passages"],
+                  rows: view.perWeek.map((w) => [shortDate(w.start), fmt(w.count), ...(boitage ? [fmt(w.flyers)] : [])]),
                 }}
               >
                 <ColumnChart
                   data={view.perWeek.map((w) => ({
                     label: shortDate(w.start),
                     value: w.count,
-                    detail: `≈ ${fmt(w.flyers)} flyers`,
+                    detail: boitage ? `≈ ${fmt(w.flyers)} flyers` : `${fmt(w.count)} passage${w.count > 1 ? "s" : ""}`,
                   }))}
                 />
               </ChartCard>
@@ -197,23 +211,25 @@ export default function Dashboard({ records, types, secteurs, sectorOf, isTarget
                 title="Par collègue"
                 subtitle={`Passages · ${periodLabel}`}
                 table={{
-                  columns: ["Collègue", "Passages", "Flyers estimés"],
-                  rows: view.byAuteur.map((g) => [g.key, fmt(g.count), fmt(g.flyers)]),
+                  columns: boitage ? ["Collègue", "Passages", "Flyers estimés"] : ["Collègue", "Passages"],
+                  rows: view.byAuteur.map((g) => [g.key, fmt(g.count), ...(boitage ? [fmt(g.flyers)] : [])]),
                 }}
               >
                 <BarList items={view.byAuteur.map((g) => ({ label: g.key, value: g.count }))} />
               </ChartCard>
 
-              <ChartCard
-                title="Par type de prospection"
-                subtitle={`Passages · ${periodLabel}`}
-                table={{
-                  columns: ["Type", "Passages", "Flyers estimés"],
-                  rows: view.byType.map((g) => [g.key, fmt(g.count), fmt(g.flyers)]),
-                }}
-              >
-                <BarList items={view.byType.map((g) => ({ label: g.key, value: g.count }))} />
-              </ChartCard>
+              {boitage && (
+                <ChartCard
+                  title="Par série de flyers"
+                  subtitle={`Passages · ${periodLabel}`}
+                  table={{
+                    columns: ["Série", "Passages", "Flyers estimés"],
+                    rows: view.byType.map((g) => [g.key, fmt(g.count), fmt(g.flyers)]),
+                  }}
+                >
+                  <BarList items={view.byType.map((g) => ({ label: g.key, value: g.count }))} />
+                </ChartCard>
+              )}
             </>
           )}
 

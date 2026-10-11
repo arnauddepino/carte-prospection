@@ -169,7 +169,26 @@ automatiquement par Vercel (https://carte-prospection.vercel.app).
       Tests : 100 tests unitaires ; migration 11 sur la copie des vraies
       fiches ; 15 vérifications de bout en bout ; adresses, sécurité et
       tournées sans régression
-  [!] Exécuter la migration 11, PUIS pousser la nouvelle version
+  [x] Logements sociaux en ligne (commit 6672ef6)
+  [x] Quatre prospections et comptes de l'équipe — PRÊT, À METTRE EN LIGNE
+      (migration 12 d'abord, et « Confirm email » désactivé dans Supabase) :
+      boîtage (séries de flyers, ex-« types »), porte-à-porte, gardiens,
+      commerçants (choix : deux modes séparés) dans une seule liste de la
+      barre du bas ; la carte, l'avancement des secteurs et le tableau de bord
+      suivent le mode choisi ; logements sociaux hors cible sauf pour les
+      commerçants ; tournées pour le boîtage ; contacts gardiens /
+      commerçants dans la fiche (nom, téléphone cliquable, notes) ; comptes
+      e-mail + mot de passe validés par l'administrateur (choix : accès libre
+      limité sans compte, coordonnées masquées et refusées par la base) ;
+      passages faits avant la création du compte repris à son nom ; export
+      par mode
+      Tests : 105 tests unitaires ; migration 12 sur la copie des vraies
+      fiches (32 vérifications) ; 23 vérifications de bout en bout avec trois
+      téléphones (sans compte, admin, inconnu) ; suites précédentes sans
+      régression
+  [!] Désactiver « Confirm email » (Supabase → Authentication → Sign In /
+      Providers → Email), exécuter la migration 12, PUIS pousser
+  [ ] Option : envoi d'e-mails (SMTP) pour « mot de passe oublié »
 
 
 JOURNAL
@@ -212,3 +231,6 @@ JOURNAL
 2026-10-10  Bâtiments à plusieurs adresses en ligne (commit 93477f0).
             Logements sociaux réalisés (choix : gris barré, copropriétés
             mixtes ciblées, tap normal). Migration 11 prête.
+2026-10-11  Logements sociaux en ligne (commit 6672ef6). Quatre prospections
+            (boîtage, porte-à-porte, gardiens, commerçants), comptes de
+            l'équipe validés par l'admin, contacts protégés. Migration 12 prête.

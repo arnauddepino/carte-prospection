@@ -125,6 +125,6 @@ describe("secteurs en traits ouverts", () => {
       ["ouest-2", { date: "2026-06-01T10:00:00Z", bal: 8 }],
     ]);
     const r = assignBuildings([sector(1, { coords: versNord, cote: "gauche" })], centers, graph);
-    expect(sectorStats(1, r, records, now)).toEqual({ total: 2, aJour: 1, pct: 50, bal: 20, balConnus: 2 });
+    expect(sectorStats(1, r, records, { now })).toEqual({ total: 2, aJour: 1, pct: 50, bal: 20, balConnus: 2 });
   });
 });

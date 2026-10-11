@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import { AGE_STEPS, colorFor, NEVER_COLOR, styleFor } from "./colors";
 import { fromDateInputValue, relativeDay, toDateInputValue } from "./dates";
 import { fichesCsv, passagesCsv } from "./csv";
+import { choixFrom, choixValue, dateMode, derniereDate, passageLabel } from "./modes";
 import {
   applyPassage,
   formToPayload,
@@ -152,7 +153,7 @@ describe("export CSV", () => {
     expect(csv.startsWith("\uFEFF")).toBe(true);
     const [header, line] = csv.slice(1).split("\r\n");
     expect(header.split(";")[0]).toBe("Bâtiment");
-    expect(line).toContain(";Flyer A;Léa;12;Saisie dans l’appli;Code;A1;oui;Coché dans l’appli;");
+    expect(line).toContain(";Flyer A;;;;Léa;12;Saisie dans l’appli;Code;A1;oui;Coché dans l’appli;");
     expect(line).toContain('"dit ""bonjour""; sympa"');
     expect(line.endsWith(";48.845123;2.291235")).toBe(true);
   });
@@ -176,7 +177,52 @@ describe("export CSV", () => {
       { date: "2026-09-01T10:00:00Z", id_batiment: "way/1", prospection_type_id: 1 },
     ];
     const lines = passagesCsv(passages, types, () => list).slice(1).split("\r\n");
-    expect(lines[1]).toContain("way/1;14 Rue Leblanc;oui;Flyer A");
-    expect(lines[2]).toContain("way/1;12, 14 Rue Leblanc;;Flyer A");
+    expect(lines[1]).toContain("way/1;14 Rue Leblanc;oui;Boîtage;Flyer A");
+    expect(lines[2]).toContain("way/1;12, 14 Rue Leblanc;;Boîtage;Flyer A");
+  });
+});
+
+describe("modes de prospection", () => {
+  test("un porte-à-porte ne change pas le dernier boîtage, mais l'auteur de la fiche", () => {
+    const boite = applyPassage(undefined, { id_batiment: "way/1", date: "2026-10-01T10:00:00Z", prospection_type_id: 1, auteur: "Léa", auteur_id: "lea" });
+    const pap = applyPassage(boite, { id_batiment: "way/1", date: "2026-10-05T10:00:00Z", mode: "porte_a_porte", prospection_type_id: null, auteur: "Owen", auteur_id: "owen" });
+    expect(pap).toMatchObject({ date: "2026-10-01T10:00:00Z", prospection_type_id: 1, dernier_auteur: "Owen", dernier_auteur_id: "owen" });
+    expect(pap.modes).toEqual({ porte_a_porte: { date: "2026-10-05T10:00:00Z", auteur: "Owen" } });
+    expect(dateMode(pap, "porte_a_porte")).toBe("2026-10-05T10:00:00Z");
+    expect(dateMode(pap, "gardien")).toBeNull();
+    expect(derniereDate(pap)).toBe("2026-10-05T10:00:00Z");
+  });
+
+  test("passage plus ancien d'un mode : sans effet ; boîtage plus récent : l'auteur change", () => {
+    let r = applyPassage(undefined, { id_batiment: "way/1", date: "2026-10-05T10:00:00Z", mode: "gardien", auteur: "Owen", auteur_id: "owen" });
+    r = applyPassage(r, { id_batiment: "way/1", date: "2026-09-01T10:00:00Z", mode: "gardien", auteur: "Léa", auteur_id: "lea" });
+    expect(r.modes.gardien.auteur).toBe("Owen");
+    expect(r.date).toBeUndefined();
+    r = applyPassage(r, { id_batiment: "way/1", date: "2026-10-06T10:00:00Z", prospection_type_id: 2, auteur: "Léa", auteur_id: "lea" });
+    expect(r).toMatchObject({ date: "2026-10-06T10:00:00Z", dernier_auteur_id: "lea", modes: { gardien: { auteur: "Owen" } } });
+  });
+
+  test("le passage n'envoie le mode, la série et les adresses que s'il le faut", () => {
+    const p = passagePayload({ id_batiment: "way/1", typeId: 3, mode: "commercant", adresses: ["a"] });
+    expect(p).toMatchObject({ mode: "commercant", prospection_type_id: null });
+    expect(p).not.toHaveProperty("adresses");
+    expect(passagePayload({ id_batiment: "way/1", typeId: 3 })).not.toHaveProperty("mode");
+  });
+
+  test("choix de la barre du bas", () => {
+    expect(choixValue({ mode: "boitage", typeId: 4 })).toBe("t:4");
+    expect(choixValue({ mode: "boitage", typeId: null })).toBe("");
+    expect(choixValue({ mode: "gardien", typeId: 4 })).toBe("m:gardien");
+    expect(choixFrom("t:4")).toEqual({ mode: "boitage", typeId: 4 });
+    expect(choixFrom("m:porte_a_porte")).toEqual({ mode: "porte_a_porte", typeId: null });
+    expect(passageLabel({ mode: "gardien" }, () => "x")).toBe("Gardien");
+    expect(passageLabel({ prospection_type_id: 1 }, () => "Flyer A")).toBe("Flyer A");
+  });
+
+  test("filtre d'ancienneté selon le mode affiché", () => {
+    const r = { date: "2026-01-01T10:00:00Z", modes: { porte_a_porte: { date: "2026-10-01T10:00:00Z" } } };
+    const now = new Date("2026-10-08T10:00:00Z");
+    expect(matchesFilters(r, { ...NO_FILTERS, age: "recent" }, now)).toBe(false);
+    expect(matchesFilters(r, { ...NO_FILTERS, age: "recent" }, now, null, false, dateMode(r, "porte_a_porte"))).toBe(true);
   });
 });

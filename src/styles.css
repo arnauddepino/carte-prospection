@@ -1400,3 +1400,70 @@ fieldset.plain:disabled {
   margin-left: 2px;
   padding: 2px 8px;
 }
+
+/* ─── Gardiens et commerçants (fiche) ─── */
+.contacts {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.contacts li {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.contacts li > div {
+  display: grid;
+  gap: 3px;
+  font-size: 15px;
+}
+.contact-tel {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+.contact-notes,
+.contact-reserve {
+  font-size: 14px;
+  color: var(--muted);
+  white-space: pre-line;
+}
+.contact-reserve {
+  font-style: italic;
+}
+.contact-form {
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.link-button {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-weight: 600;
+  color: var(--ink);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.hint.grow {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Équipe (administrateur) ─── */
+.team li {
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+.team-actions {
+  display: flex;
+  gap: 8px;
+}

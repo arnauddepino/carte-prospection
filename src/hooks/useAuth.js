@@ -4,10 +4,15 @@ import { readJson, writeJson } from "../lib/storage";
 
 const ADMIN_EMAIL = import.meta.env.REACT_APP_ADMIN_EMAIL;
 const ADMIN_CACHE = "prospection.admin";
+const MEMBRE_CACHE = "prospection.membre";
 
 // Identité du téléphone :
-//   • utilisateur : connexion anonyme Supabase, automatique et invisible
-//     (le prénom reste le seul renseignement demandé) ;
+//   • sans compte : connexion anonyme Supabase, automatique et invisible
+//     (le prénom reste le seul renseignement demandé) ; accès limité (les
+//     coordonnées des gardiens et commerçants sont masquées) ;
+//   • membre de l'équipe : compte e-mail + mot de passe, validé par
+//     l'administrateur (membre = { prenom, statut } ; statut « en_attente »,
+//     « actif » ou « refuse ») ;
 //   • administrateur : compte Supabase protégé par un mot de passe.
 // La session est gardée sur le téléphone : l'appli fonctionne hors ligne une
 // fois connectée.
@@ -16,6 +21,21 @@ export function useAuth() {
   const [ready, setReady] = useState(false);
   const [error, setError] = useState(null);
   const [isAdmin, setIsAdmin] = useState(() => readJson(ADMIN_CACHE, false));
+  const [membre, setMembre] = useState(() => readJson(MEMBRE_CACHE, null));
+
+  // Demande d'accès du compte connecté (null sans compte, ou pour l'admin).
+  const loadMembre = useCallback(async (s) => {
+    if (!s || s.user?.is_anonymous) {
+      setMembre(null);
+      writeJson(MEMBRE_CACHE, null);
+      return null;
+    }
+    const { data, error: e } = await supabase.from("membres").select("prenom, statut").eq("user_id", s.user.id).maybeSingle();
+    if (e) return readJson(MEMBRE_CACHE, null); // hors ligne : dernier état connu
+    setMembre(data);
+    writeJson(MEMBRE_CACHE, data);
+    return data;
+  }, []);
 
   const checkAdmin = useCallback(async (s) => {
     if (!s || s.user?.is_anonymous) {
@@ -53,7 +73,10 @@ export function useAuth() {
       if (cancelled) return;
       setSession(s);
       setReady(true);
-      if (s) checkAdmin(s);
+      if (s) {
+        checkAdmin(s);
+        loadMembre(s);
+      }
     };
     init();
     const onOnline = () => !cancelled && init();
@@ -66,7 +89,7 @@ export function useAuth() {
       window.removeEventListener("online", onOnline);
       sub.subscription.unsubscribe();
     };
-  }, [signInAnonymously, checkAdmin]);
+  }, [signInAnonymously, checkAdmin, loadMembre]);
 
   // Connexion administrateur. Renvoie un message d'erreur, ou null.
   const signInAdmin = useCallback(
@@ -92,16 +115,63 @@ export function useAuth() {
     const s = await signInAnonymously();
     setSession(s);
     checkAdmin(s);
-  }, [session, signInAnonymously, checkAdmin]);
+    loadMembre(s);
+  }, [session, signInAnonymously, checkAdmin, loadMembre]);
+
+  // Création d'un compte de l'équipe. Les passages déjà faits sur ce
+  // téléphone lui seront rattachés à la validation (jeton de l'identité
+  // anonyme). Renvoie un message d'erreur, ou null.
+  const signUp = useCallback(
+    async ({ prenom, email, password }) => {
+      let jeton = null;
+      if (session?.user?.is_anonymous) {
+        const { data } = await supabase.rpc("preparer_compte");
+        jeton = data ?? null;
+      }
+      const { data, error: e } = await supabase.auth.signUp({ email, password, options: { data: { prenom } } });
+      if (e) {
+        if (/already|registered|exists/i.test(e.message)) return "Un compte existe déjà avec cet e-mail : connectez-vous.";
+        if (/password/i.test(e.message)) return "Mot de passe trop court (6 caractères au moins).";
+        return `Création impossible : ${e.message}`;
+      }
+      if (!data.session) return "Compte créé, mais la confirmation par e-mail est activée dans Supabase : à désactiver par l’administrateur.";
+      setSession(data.session);
+      const { error: e2 } = await supabase.rpc("demander_acces", { p_prenom: prenom, p_jeton: jeton });
+      if (e2) return `Demande d’accès impossible : ${e2.message}`;
+      await loadMembre(data.session);
+      checkAdmin(data.session);
+      return null;
+    },
+    [session, loadMembre, checkAdmin]
+  );
+
+  // Connexion d'un membre de l'équipe. Renvoie { error, membre }.
+  const signIn = useCallback(
+    async ({ email, password }) => {
+      const { data, error: e } = await supabase.auth.signInWithPassword({ email, password });
+      if (e) return { error: /invalid/i.test(e.message) ? "E-mail ou mot de passe incorrect." : `Connexion impossible : ${e.message}` };
+      setSession(data.session);
+      checkAdmin(data.session);
+      return { error: null, membre: await loadMembre(data.session) };
+    },
+    [checkAdmin, loadMembre]
+  );
 
   return {
     ready,
     error,
     uid: session?.user?.id ?? null,
+    email: session?.user?.is_anonymous ? null : (session?.user?.email ?? null),
     isAdmin: Boolean(session && !session.user?.is_anonymous && isAdmin),
+    membre,
+    // Membre validé (ou administrateur) : voit et gère les coordonnées des contacts.
+    estMembre: Boolean(session && !session.user?.is_anonymous && (isAdmin || membre?.statut === "actif")),
+    refreshMembre: () => loadMembre(session),
     retry: () => window.location.reload(),
     signInAdmin,
     becomeUser,
+    signUp,
+    signIn,
   };
 }
 

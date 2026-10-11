@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AGE_STEPS, NEVER_COLOR, SOCIAL_COLOR, styleFor } from "../lib/colors";
 import { hasFilters, NO_FILTERS } from "../lib/prospections";
+import { modeInfo } from "../lib/modes";
 import Icon from "./Icon";
 
 const LEGEND = [...AGE_STEPS, { color: NEVER_COLOR, label: "Jamais prospecté" }];
@@ -32,7 +33,12 @@ export default function SettingsSheet({
   onCreateType,
   onExport,
   auteur,
+  terrain = "boitage",
   isAdmin = false,
+  compte = { email: null, membre: null },
+  onAccount,
+  onSignOut,
+  onTeam,
   onChangeAuteur,
   onClose,
 }) {
@@ -58,7 +64,7 @@ export default function SettingsSheet({
       </header>
 
       <div className="sheet-body">
-        <h3>Dernier passage</h3>
+        <h3>Dernier passage · {modeInfo(terrain).label}</h3>
         <ul className="legend">
           {LEGEND.map((step) => (
             <li key={step.label}>
@@ -95,9 +101,9 @@ export default function SettingsSheet({
           </div>
         )}
         <div className="field">
-          <label htmlFor="flt-type">Type de prospection</label>
+          <label htmlFor="flt-type">Série de flyers (boîtage)</label>
           <select id="flt-type" value={filters.typeId ?? ""} onChange={(e) => set({ typeId: toId(e.target.value) })}>
-            <option value="">Tous les types</option>
+            <option value="">Toutes les séries</option>
             {types.map((t) => (
               <option key={t.id} value={t.id}>
                 {t.name}
@@ -149,12 +155,12 @@ export default function SettingsSheet({
           </>
         )}
 
-        <h3>Nouveau type de prospection</h3>
+        <h3>Nouvelle série de flyers (boîtage)</h3>
         <form className="field-inline" onSubmit={create}>
           <input
             type="text"
             placeholder="Ex. : Flyer estimation octobre"
-            aria-label="Nom du nouveau type"
+            aria-label="Nom de la nouvelle série de flyers"
             value={newTypeName}
             onChange={(e) => setNewTypeName(e.target.value)}
           />
@@ -177,12 +183,41 @@ export default function SettingsSheet({
         <div className="field-inline identity-row">
           <span>
             {auteur}
-            <span className="role-label">{isAdmin ? "Administrateur" : "Utilisateur"}</span>
+            <span className="role-label">
+              {isAdmin
+                ? "Administrateur"
+                : compte.membre?.statut === "actif"
+                  ? "Membre de l’équipe"
+                  : compte.membre?.statut === "en_attente"
+                    ? "Compte en attente de validation"
+                    : compte.membre?.statut === "refuse"
+                      ? "Compte sans accès"
+                      : "Sans compte : coordonnées des contacts masquées"}
+            </span>
           </span>
           <button type="button" className="button secondary" onClick={onChangeAuteur}>
             Changer de prénom
           </button>
         </div>
+        <div className="field-inline">
+          {compte.email ? (
+            <>
+              <span className="hint grow">{compte.email}</span>
+              <button type="button" className="button secondary" onClick={onSignOut}>
+                Se déconnecter
+              </button>
+            </>
+          ) : (
+            <button type="button" className="button secondary grow" onClick={onAccount}>
+              Se connecter ou créer un compte
+            </button>
+          )}
+        </div>
+        {isAdmin && (
+          <button type="button" className="button secondary" onClick={onTeam}>
+            Équipe : valider les comptes
+          </button>
+        )}
       </div>
     </section>
   );

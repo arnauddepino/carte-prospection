@@ -1,15 +1,16 @@
+import { choixFrom, choixValue, MODES } from "../lib/modes";
 import Icon from "./Icon";
 
-const toId = (value) => (value ? Number(value) : null);
-
-// Barre du bas, à portée de pouce : mode, type en cours, localisation,
-// légende et filtres.
+// Barre du bas, à portée de pouce : prospecter / éditer, prospection en cours
+// (série de flyers pour le boîtage, ou porte-à-porte, gardiens, commerçants),
+// localisation, tableau de bord, secteurs, légende et filtres.
 export default function BottomBar({
   mode,
   onMode,
   types,
   selectedType,
-  onSelectType,
+  terrain = "boitage",
+  onChoix,
   typeSelectRef,
   locating,
   onLocate,
@@ -31,21 +32,31 @@ export default function BottomBar({
 
       <div className="bar-row">
         {mode === "prospect" ? (
-          <label className={`type-chip${selectedType ? "" : " is-empty"}`}>
-            <span className="type-chip-label">Type</span>
+          <label className={`type-chip${terrain !== "boitage" || selectedType ? "" : " is-empty"}`}>
+            <span className="type-chip-label">Prospection</span>
             <select
               ref={typeSelectRef}
-              value={selectedType ?? ""}
-              onChange={(e) => onSelectType(toId(e.target.value))}
+              aria-label="Prospection en cours"
+              value={choixValue({ mode: terrain, typeId: selectedType })}
+              onChange={(e) => onChoix(choixFrom(e.target.value))}
             >
               <option value="" disabled>
-                Choisir un type…
+                Choisir…
               </option>
-              {types.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
-              ))}
+              <optgroup label="Boîtage : série de flyers">
+                {types.map((t) => (
+                  <option key={t.id} value={`t:${t.id}`}>
+                    {t.name}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Autres prospections">
+                {MODES.filter((m) => m.value !== "boitage").map((m) => (
+                  <option key={m.value} value={`m:${m.value}`}>
+                    {m.label}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </label>
         ) : (

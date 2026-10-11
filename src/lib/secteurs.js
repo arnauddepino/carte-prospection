@@ -116,15 +116,22 @@ export function assignBuildings(sectors, centers, graph) {
 
 // Avancement d'un secteur : bâtiments prospectés depuis moins de `days` jours,
 // et boîtes aux lettres connues (pour préparer les flyers). isTarget(id) :
-// bâtiment ciblé (les logements sociaux ne comptent pas).
-export function sectorStats(sectorId, assignment, records, now = new Date(), days = 30, isTarget = () => true) {
+// bâtiment ciblé (les logements sociaux ne comptent pas) ; dateOf(id, fiche) :
+// date du dernier passage du mode suivi (boîtage par défaut).
+export function sectorStats(
+  sectorId,
+  assignment,
+  records,
+  { now = new Date(), days = 30, isTarget = () => true, dateOf = (id, r) => r?.date } = {}
+) {
   let total = 0, aJour = 0, bal = 0, balConnus = 0;
   const limit = now - days * 864e5;
   for (const [id, s] of assignment) {
     if (s !== sectorId || !isTarget(id)) continue;
     total++;
     const r = records.get(id);
-    if (r?.date && new Date(r.date) >= limit) aJour++;
+    const d = dateOf(id, r);
+    if (d && new Date(d) >= limit) aJour++;
     if (r?.bal != null) {
       bal += Number(r.bal);
       balConnus++;

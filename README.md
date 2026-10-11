@@ -14,9 +14,15 @@ localisation, légende et filtres. Recherche d'adresse en haut.
   interphone, inaccessible), code d'entrée, BAL, logement social, infos, et l'historique
   des passages (ajout d'un passage daté, suppression). Le clic droit / appui long ouvre
   aussi la fiche dans les deux modes.
-- **Prénom et connexion** : seul le prénom est demandé ; chaque téléphone reçoit en arrière-plan
-  une identité anonyme sécurisée (Supabase). Avec le prénom « Arnaud », l'appli propose
-  « Utilisateur » ou « Administrateur » (mot de passe).
+- **Quatre prospections** : boîtage (par série de flyers), porte-à-porte, gardiens et
+  commerçants, choisies dans la barre du bas ; la carte montre l'ancienneté du mode choisi.
+- **Prénom et connexion** : sans compte, seul le prénom est demandé (identité anonyme
+  Supabase en arrière-plan) ; les coordonnées des gardiens et commerçants sont alors masquées.
+  Chaque collègue peut créer un compte (prénom, e-mail, mot de passe), validé par
+  l'administrateur dans « Légende et filtres » → « Équipe ». Avec le prénom « Arnaud »,
+  l'appli propose « Utilisateur » ou « Administrateur » (mot de passe).
+  Réglage Supabase requis : Authentication → Sign In / Providers → Email → « Confirm email »
+  désactivé (la validation se fait par l'administrateur, sans e-mail).
 - **Droits** (appliqués par la base) : chacun prospecte et annule ses propres passages ; la fiche
   d'un bâtiment est modifiable par l'auteur du dernier passage ou l'administrateur ; secteurs et
   suppression de fiche réservés à l'administrateur ; tout le monde peut créer un type.
@@ -93,11 +99,13 @@ public/
 ## Données
 
 - Tables Supabase :
-  - `passages` : l'historique, une ligne par passage (date, type, prénom) ;
+  - `passages` : l'historique, une ligne par passage (date, mode, série de flyers, prénom) ;
+  - `membres` : comptes de l'équipe et leur validation ; `contacts` (catégorie, enseigne,
+    visibles de tous) et `contacts_prives` (nom, téléphone, notes : membres seulement) ;
   - `prospections` : la fiche de chaque bâtiment (BAL, code, accès, logement social,
     infos) et le résumé de son dernier passage, **tenu à jour par la base**
     (déclencheurs de la migration 03) : l'appli n'écrit jamais la date dans cette table ;
-  - `prospection_types` : les types de prospection ;
+  - `prospection_types` : les séries de flyers (boîtage) ;
   - `secteurs` : nom, couleur, responsable et tronçons de rue
     (`troncons` : coordonnées + côté couvert : `deux`, `gauche` ou `droite` par rapport
     au sens de tracé).

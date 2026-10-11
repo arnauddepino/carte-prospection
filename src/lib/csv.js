@@ -1,6 +1,7 @@
 import { formatAdresses } from "./adresses";
 import { BAL_SOURCES } from "./bal";
 import { SOCIAL_SOURCES } from "./social";
+import { dateMode, modeInfo } from "./modes";
 import { accesLabel } from "./prospections";
 
 // CSV pour Excel en français : séparateur « ; », BOM UTF-8 pour les accents.
@@ -37,9 +38,12 @@ export function fichesCsv(
     [
       { label: "Bâtiment", value: (r) => r.id_batiment },
       { label: "Adresses", value: (r) => formatAdresses(adressesFor(r.id_batiment)) },
-      { label: "Dernier passage", value: (r) => dateFr(r.date) },
-      { label: "Type", value: (r) => typeName(r.prospection_type_id) },
-      { label: "Par", value: (r) => r.dernier_auteur },
+      { label: "Dernier boîtage", value: (r) => dateFr(r.date) },
+      { label: "Série de flyers", value: (r) => typeName(r.prospection_type_id) },
+      { label: "Dernier porte-à-porte", value: (r) => dateFr(dateMode(r, "porte_a_porte")) },
+      { label: "Dernière visite gardien", value: (r) => dateFr(dateMode(r, "gardien")) },
+      { label: "Dernière visite commerçants", value: (r) => dateFr(dateMode(r, "commercant")) },
+      { label: "Dernier passage par", value: (r) => r.dernier_auteur },
       { label: "Boîtes aux lettres", value: (r) => infoOf(r.id_batiment).value },
       { label: "Source BAL", value: (r) => BAL_SOURCES[infoOf(r.id_batiment).source]?.long ?? "" },
       { label: "Accès", value: (r) => accesLabel(r.acces) },
@@ -67,7 +71,8 @@ export function passagesCsv(passages, types, adressesFor = () => []) {
       { label: "Bâtiment", value: (p) => p.id_batiment },
       { label: "Adresses couvertes", value: couvertes },
       { label: "Partiel", value: (p) => (p.adresses?.length ? "oui" : "") },
-      { label: "Type", value: (p) => typeName(p.prospection_type_id) },
+      { label: "Prospection", value: (p) => modeInfo(p.mode).label },
+      { label: "Série de flyers", value: (p) => ((p.mode ?? "boitage") === "boitage" ? typeName(p.prospection_type_id) : "") },
       { label: "Par", value: (p) => p.auteur },
     ],
     passages

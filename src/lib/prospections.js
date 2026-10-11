@@ -1,4 +1,5 @@
 import { fromDateInputValue } from "./dates";
+import { derniereDate } from "./modes";
 
 // Identifiant OSM d'un bâtiment (ex. « way/123456 »).
 export const featureId = (feature) => feature.id || feature.properties["@id"];
@@ -56,25 +57,47 @@ export function formToPayload(form) {
 // Nouveau passage. Sans date (tap), c'est maintenant ; une date choisie dans
 // la fiche est placée à midi pour rester sur le bon jour. adresses : les
 // adresses couvertes (identifiants BAN) quand le passage ne couvre qu'une
-// partie du bâtiment ; absent = tout le bâtiment.
-export function passagePayload({ id_batiment, date, typeId, auteur, adresses }) {
+// partie du bâtiment ; absent = tout le bâtiment. mode : boîtage par défaut
+// (envoyé seulement pour les autres modes ; série de flyers et adresses ne
+// concernent que le boîtage).
+export function passagePayload({ id_batiment, date, typeId, auteur, adresses, mode = "boitage" }) {
+  const boitage = mode === "boitage";
   return {
     client_id: crypto.randomUUID(), // identifiant stable, même hors ligne (évite les doublons au renvoi)
     id_batiment,
     date: date ? fromDateInputValue(date) : new Date().toISOString(),
-    prospection_type_id: typeId,
+    prospection_type_id: boitage ? typeId : null,
     auteur: toText(auteur),
-    ...(adresses?.length ? { adresses } : {}),
+    ...(boitage ? {} : { mode }),
+    ...(boitage && adresses?.length ? { adresses } : {}),
   };
 }
 
 const after = (a, b) => new Date(a) > new Date(b);
 
 // La fiche après un passage, comme le calcule la base (déclencheur
-// sync_dernier_passage) : le résumé du dernier passage ne change que pour un
-// passage plus récent ; date_complet = dernier passage sur tout le bâtiment ;
-// adresses = { idBan: date } des passages partiels postérieurs.
+// sync_dernier_passage) :
+//   • boîtage : date / type du dernier boîtage ; date_complet = dernier boîtage
+//     sur tout le bâtiment ; adresses = { idBan: date } des boîtages partiels
+//     postérieurs ;
+//   • autres modes : modes[mode] = { date, auteur } du dernier passage ;
+//   • dernier_auteur(_id) : auteur du dernier passage, tous modes.
+// Seul un passage plus récent que le dernier connu change chaque résumé.
 export function applyPassage(record, passage) {
+  const mode = passage.mode ?? "boitage";
+  const latest = derniereDate(record);
+  const auteur =
+    !latest || !after(latest, passage.date) ? { dernier_auteur: passage.auteur, dernier_auteur_id: passage.auteur_id ?? null } : {};
+
+  if (mode !== "boitage") {
+    const prev = record?.modes?.[mode];
+    const modes =
+      !prev || !after(prev.date, passage.date)
+        ? { ...record?.modes, [mode]: { date: passage.date, auteur: passage.auteur } }
+        : (record?.modes ?? null);
+    return { ...record, id_batiment: passage.id_batiment, modes, ...auteur };
+  }
+
   const complet = (record && "date_complet" in record ? record.date_complet : record?.date) ?? null;
   let date_complet = complet;
   let adresses = record?.adresses ?? null;
@@ -88,15 +111,9 @@ export function applyPassage(record, passage) {
     adresses = { ...adresses };
     for (const a of passage.adresses) if (!adresses[a] || after(passage.date, adresses[a])) adresses[a] = passage.date;
   }
-  const base = { ...record, id_batiment: passage.id_batiment, date_complet, adresses };
+  const base = { ...record, id_batiment: passage.id_batiment, date_complet, adresses, ...auteur };
   if (record?.date && after(record.date, passage.date)) return base;
-  return {
-    ...base,
-    date: passage.date,
-    prospection_type_id: passage.prospection_type_id,
-    dernier_auteur: passage.auteur,
-    dernier_auteur_id: passage.auteur_id ?? null,
-  };
+  return { ...base, date: passage.date, prospection_type_id: passage.prospection_type_id };
 }
 
 // ─── Filtres d'affichage ──────────────────────────────────────────────────
@@ -119,7 +136,15 @@ const DAYS_30 = 30 * 24 * 3600 * 1000;
 // Le bâtiment correspond-il à tous les filtres actifs ? (secteurId = secteur
 // du bâtiment, s'il en a un ; social = logement social, d'après la fiche et
 // les données publiques)
-export function matchesFilters(record, f, now = new Date(), secteurId = null, social = Boolean(record?.logement_social)) {
+// date = date du dernier passage du mode affiché (ancienneté).
+export function matchesFilters(
+  record,
+  f,
+  now = new Date(),
+  secteurId = null,
+  social = Boolean(record?.logement_social),
+  date = record?.date
+) {
   if (f.secteurId && secteurId !== f.secteurId) return false;
   if (f.typeId && record?.prospection_type_id !== f.typeId) return false;
   if (f.auteur && record?.dernier_auteur !== f.auteur) return false;
@@ -127,7 +152,7 @@ export function matchesFilters(record, f, now = new Date(), secteurId = null, so
   if (f.inaccessible && record?.acces !== "inaccessible") return false;
   if (f.social && !social) return false;
   if (f.age) {
-    const recent = record?.date && now - new Date(record.date) < DAYS_30;
+    const recent = date && now - new Date(date) < DAYS_30;
     if (f.age === "recent" ? !recent : recent) return false;
   }
   return true;
